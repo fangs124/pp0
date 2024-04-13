@@ -1,0 +1,3 @@
+[workspace]
+members = [ "array_vec", "bitboard","chessboard", "nnet", "pp0_chess"]
+resolver = "2"
