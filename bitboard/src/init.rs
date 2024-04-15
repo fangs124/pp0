@@ -1,4 +1,4 @@
-use crate::chess::*;
+#![allow(long_running_const_eval)]
 use crate::*;
 
 pub(crate) const fn rays() -> [[BitBoard; 64]; 64] {
@@ -370,7 +370,7 @@ const SIZE_ROOK: usize = 1 << 12; //size of the index for rook magic bitboard in
 pub const fn bishop_attack_mbb() -> [[BitBoard; SIZE_BISHOP]; 64] {
     let mut i: usize = 0;
     let mut attacks: [[BitBoard; 1 << 9]; 64] = [[BitBoard::ZERO; 1 << 9]; 64];
-    let bishop_mbb_mask = CONST_BISHOP_MBB_MASK;
+    let bishop_mbb_mask = BISHOP_MBB_MASK;
     let bishop_occ_bitcount = BISHOP_OCC_BITCOUNT;
     while i < 64 {
         let mask = bishop_mbb_mask[i];
@@ -397,7 +397,7 @@ pub const fn bishop_attack_mbb() -> [[BitBoard; SIZE_BISHOP]; 64] {
 pub const fn rook_attack_mbb() -> [[BitBoard; SIZE_ROOK]; 64] {
     let mut i: usize = 0;
     let mut attacks: [[BitBoard; 1 << 12]; 64] = [[BitBoard::ZERO; 1 << 12]; 64];
-    let rook_mbb_mask = CONST_ROOK_MBB_MASK;
+    let rook_mbb_mask = ROOK_MBB_MASK;
     let rook_occ_bitcount = ROOK_OCC_BITCOUNT;
     while i < 64 {
         let mask = rook_mbb_mask[i];
@@ -444,8 +444,8 @@ pub fn init_magics(piece_type: PieceType) -> [u64; 64] {
         let mut magic: u64 = 0;
         while !magic_found {
             magic = match piece_type {
-                PieceType::Bishop => find_magic_number(i, crate::chess::BISHOP_OCC_BITCOUNT[i], piece_type),
-                PieceType::Rook => find_magic_number(i, crate::chess::ROOK_OCC_BITCOUNT[i], piece_type),
+                PieceType::Bishop => find_magic_number(i, crate::chessbb::BISHOP_OCC_BITCOUNT[i], piece_type),
+                PieceType::Rook => find_magic_number(i, crate::chessbb::ROOK_OCC_BITCOUNT[i], piece_type),
                 _ => panic!("init_magic_numbers error: invalid PieceType variable"),
             };
             magic_found = true;
@@ -470,8 +470,8 @@ pub fn find_magic_number(square: usize, mask_bitcount: usize, piece_type: PieceT
     let mut attacks: Vec<BitBoard> = vec![BitBoard::ZERO; max_index];
     //let mut attack_history: Vec<BB> = vec![BitBoard::ZERO; max_index];
     let mask = match piece_type {
-        PieceType::Bishop => crate::chess::BISHOP_MBB_MASK[square],
-        PieceType::Rook => crate::chess::ROOK_MBB_MASK[square],
+        PieceType::Bishop => crate::chessbb::BISHOP_MBB_MASK[square],
+        PieceType::Rook => crate::chessbb::ROOK_MBB_MASK[square],
         _ => panic!("find_magic_number error: invalid piece type!"),
     };
 

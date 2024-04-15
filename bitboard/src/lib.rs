@@ -1,9 +1,10 @@
 #![allow(long_running_const_eval)]
-pub mod chess;
+pub mod chessbb;
+mod constdata;
 pub mod init;
-
+use chessbb::*;
 use std::fmt::Display;
-use std::ops::{BitAnd, BitOr, BitXor, Not};
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
 
 use serde::{Deserialize, Serialize};
 
@@ -30,6 +31,12 @@ impl BitAnd for BitBoard {
     }
 }
 
+impl BitAndAssign for BitBoard {
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.data &= rhs.data;
+    }
+}
+
 impl BitOr for BitBoard {
     type Output = BitBoard;
     fn bitor(self, rhs: BitBoard) -> Self::Output {
@@ -37,10 +44,21 @@ impl BitOr for BitBoard {
     }
 }
 
+impl BitOrAssign for BitBoard {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.data |= rhs.data;
+    }
+}
+
 impl BitXor for BitBoard {
     type Output = BitBoard;
     fn bitxor(self, rhs: BitBoard) -> Self::Output {
         BitBoard { data: self.data ^ rhs.data }
+    }
+}
+impl BitXorAssign for BitBoard {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.data ^= rhs.data;
     }
 }
 
@@ -53,6 +71,11 @@ impl Not for BitBoard {
 
 /* some u64 bit manipulation support */
 impl BitBoard {
+    #[inline(always)]
+    pub const fn new(data: u64) -> Self {
+        Self { data }
+    }
+
     //pub const MOVES: u16 = 64 * 64 * 5; //{64-from square index} x {64-to square index} x {promotion data}
     pub const ZERO: BitBoard = BitBoard { data: 0u64 };
     pub const ONES: BitBoard = BitBoard { data: u64::MAX };
@@ -64,10 +87,14 @@ impl BitBoard {
     }
 
     #[inline(always)]
+    pub const fn count_ones(&self) -> u32 {
+        self.data.count_ones()
+    }
+
+    #[inline(always)]
     pub const fn bit_and(&self, other: &BitBoard) -> BitBoard {
         BitBoard { data: self.data & other.data }
     }
-
     #[inline(always)]
     pub const fn bit_or(&self, other: &BitBoard) -> BitBoard {
         BitBoard { data: self.data | other.data }
@@ -116,6 +143,32 @@ impl BitBoard {
     //        },
     //    }
     //}
+
+    #[inline(always)]
+    pub const fn nth_is_zero(&self, index: usize) -> bool {
+        match self.data & (1u64 << index) {
+            0 => true,
+            _ => false,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn nth_is_not_zero(&self, index: usize) -> bool {
+        match self.data & (1u64 << index) {
+            0 => false,
+            _ => true,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn is_zero(&self) -> bool {
+        self.data == 0u64
+    }
+
+    #[inline(always)]
+    pub const fn is_not_zero(&self) -> bool {
+        self.data != 0u64
+    }
 
     //reflects the bitboard across a horizontal line.
     pub const fn refl(&self) -> BitBoard {
@@ -234,3 +287,86 @@ pub const ADIAG: [usize; 64] = [
 ];
 
 pub const RAYS: [[BitBoard; 64]; 64] = init::rays();
+
+/* chessboard specific bitboard functions and definitions*/
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum PieceType {
+    Pawn,
+    Knight,
+    Bishop,
+    Rook,
+    Queen,
+    King,
+}
+
+impl PieceType {
+    pub const fn to_char(&self) -> char {
+        match self {
+            PieceType::Pawn => 'p',
+            PieceType::Knight => 'n',
+            PieceType::Bishop => 'b',
+            PieceType::Rook => 'r',
+            PieceType::Queen => 'q',
+            PieceType::King => 'k',
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Side {
+    White,
+    Black,
+}
+
+impl Side {
+    pub const fn update(&self) -> Side {
+        match self {
+            Side::White => Side::Black,
+            Side::Black => Side::White,
+        }
+    }
+}
+
+#[inline(always)]
+pub fn get_pawn_attack(square: usize, side: Side) -> BitBoard {
+    match side {
+        Side::White => W_PAWN_ATTACKS[square],
+        Side::Black => B_PAWN_ATTACKS[square],
+    }
+}
+
+#[inline(always)]
+pub const fn get_w_pawn_attack(square: usize) -> BitBoard {
+    W_PAWN_ATTACKS[square]
+}
+
+#[inline(always)]
+pub const fn get_b_pawn_attack(square: usize) -> BitBoard {
+    B_PAWN_ATTACKS[square]
+}
+
+#[inline(always)]
+pub const fn get_knight_attack(square: usize) -> BitBoard {
+    KNIGHT_ATTACKS[square]
+}
+
+#[inline(always)]
+pub const fn get_king_attack(square: usize) -> BitBoard {
+    KING_ATTACKS[square]
+}
+
+pub const fn get_bishop_attack(square: usize, blockers: BitBoard) -> BitBoard {
+    let data = blockers.data & BISHOP_MBB_MASK[square].data;
+    let m = magic_index(BISHOP_MAGICS[square], BitBoard { data }, BISHOP_OCC_BITCOUNT[square]);
+    return BISHOP_ATTACKS_MBB[square][m];
+}
+
+pub const fn get_rook_attack(square: usize, blockers: BitBoard) -> BitBoard {
+    let data = blockers.data & ROOK_MBB_MASK[square].data;
+    let m = magic_index(ROOK_MAGICS[square], BitBoard { data }, ROOK_OCC_BITCOUNT[square]);
+    return ROOK_ATTACKS_MBB[square][m];
+}
+
+pub const fn get_queen_attack(square: usize, blockers: BitBoard) -> BitBoard {
+    BitBoard { data: get_bishop_attack(square, blockers).data | get_rook_attack(square, blockers).data }
+}
