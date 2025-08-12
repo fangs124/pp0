@@ -4,7 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-chessbb = { git = "https://github.com/fangs124/chessbb.git" }
+#nnets = { git = "https://github.com/fangs124/nnets.git" }
+#chessbb = { git = "https://github.com/fangs124/chessbb.git" }
+
+nnets = { path = "../nnets" }
+chessbb = { path = "../chessbb" }
 
 #might want to get rid of these eventually
 nalgebra = { version = "0.33", features = ["rand", "serde-serialize"] }
