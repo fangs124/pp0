@@ -4,14 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-#nnets = { git = "https://github.com/fangs124/nnets.git" }
+#nnet = { git = "https://github.com/fangs124/nnet.git" }
 #chessbb = { git = "https://github.com/fangs124/chessbb.git" }
 
-nnets = { path = "../nnets" }
+nnet = { path = "../nnet" }
 chessbb = { path = "../chessbb" }
 
 #might want to get rid of these eventually
-nalgebra = { version = "0.33", features = ["rand", "serde-serialize"] }
+nalgebra = { version = "0.34", features = ["rand", "serde-serialize"] }
 rand = { version = "0.9", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+inquire = "0.7"
+termion = "4"
+rayon = "1"
+itertools = "0.14"
