@@ -1,4 +1,4 @@
-use chessbb::{ChessBoard, ChessMove, ChessPiece, GameResult, GameState, PieceType, Side, Square};
+use chessbb::{ChessBoard, ChessMove, ChessPiece, Evaluator, GameResult, GameState, PieceType, Side, Square};
 use nalgebra::DVector;
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +21,13 @@ impl InputType for ChessGame {
     }
 }
 
+impl Evaluator for ChessNet {
+    fn eval(&mut self, cb: &ChessBoard) -> i32 {
+        self.net.forward_prop(&ChessGame {cb: cb.clone()});
+        return (self.phi_z()[0] * 1000.0) as i32;
+    }
+}
+
 impl ChessGame {
     #[inline(always)]
     pub fn start_pos() -> ChessGame {
@@ -28,7 +35,7 @@ impl ChessGame {
     }
 
     #[inline(always)]
-    pub fn new() -> ChessGame {
+    pub const fn new() -> ChessGame {
         return ChessGame { cb: ChessBoard::start_pos() };
     }
 
@@ -49,10 +56,11 @@ impl ChessGame {
     
     #[rustfmt::skip]
     #[inline(always)]
-    pub fn negamax(&mut self, a: i32, b: i32, d: usize, eval: impl FnMut(&ChessBoard) -> i32) -> (i32, Option<ChessMove>) {//
-        return self.cb.negamax(a, b, d, eval);
+    pub fn negamax(&mut self, a: i32, b: i32, d: usize, net: &mut ChessNet) -> (i32, Option<ChessMove>) {
+        return self.cb.negamax(a, b, d, net);
     }
 
+    
     #[inline(always)]
     pub fn side(&self) -> Side {
         self.cb.side()
@@ -120,24 +128,24 @@ impl ChessNet {
         //TODO safety of the return result?
         ins.push(cg.to_vector());
         outs.push(self.eval(&cg));
-        cg.clone().negamax(i32::MIN + 1, i32::MAX - 1, d, self.get_eval_fn()).1.unwrap()
+        cg.clone().negamax(i32::MIN + 1, i32::MAX - 1, d, self).1.unwrap()
     }
    
 
     pub fn negamax(&mut self, cg: &ChessGame, d: usize) -> ChessMove {
         //TODO determine if clone is necessary here
         //TODO safety of the return result?
-        cg.clone().negamax(i32::MIN + 1, i32::MAX - 1, d, self.get_eval_fn()).1.unwrap()
+        cg.clone().negamax(i32::MIN + 1, i32::MAX - 1, d, self).1.unwrap()
     }
 
-     pub fn get_eval_fn(&self) -> impl FnMut(&ChessBoard) -> i32 + use<> {
-        let mut net = self.net.clone();
-        move |cb: &ChessBoard| {
-            net.forward_prop(&ChessGame { cb: *cb });
-            let output = net.phi_z();
-            return (output[0] * 1000.0) as i32;
-        }
-    }
+    //pub fn get_eval_fn(&self) -> impl Fn(&ChessBoard) -> i32 + use<> {
+    //    let net = self.net.clone();
+    //    move |cb: &ChessBoard| {
+    //        let output = net.forward_prop_phi_mutless(&ChessGame { cb: *cb });
+    //        //let output = net.phi_z();
+    //        return (output[0] * 1000.0) as i32;
+    //    }
+    //}
 
      pub fn process_training_result(&mut self, data: TrainingResult) {
         let total_moves = data.pairs.len();
@@ -162,41 +170,6 @@ impl ChessNet {
             ith_move += 2;
         }
     }
-
-
-    //pub fn process_training_result(&mut self, data: TrainingResult) {
-    //    let total_moves = data.pairs.len();
-    //    let reward: f32 = match (data.net_side, data.result) {
-    //        (Side::X, GameResult::XWin) | (Side::O, GameResult::OWin) => 1.0,
-    //        (Side::X, GameResult::OWin) | (Side::O, GameResult::XWin) => -1.0,
-    //        (_, GameResult::Tie) => 0.1,
-    //    };
-    //
-    //    let mut ith_move: usize = match data.net_side {
-    //        Side::X => 0,
-    //        Side::O => 1,
-    //    };
-    //    /* maybe isolate this? */
-    //    for (game_move, state) in data.pairs {
-    //        let scaled_reward = reward * compute_scalar(ith_move, total_moves);
-    //        let mut target_probability = DVector::from_element(9, 0.0);
-    //        let square_index = BitBoard::index(&game_move);
-    //        if scaled_reward >= 0.0 {
-    //            target_probability[square_index] = 1.0;
-    //        } else {
-    //            let other_prob = 1.0 / ((9 - ith_move - 1) as f32);
-    //            for test_move in BitBoard::MOVES {
-    //                if state.is_valid_move(&test_move) && (test_move != game_move) {
-    //                    target_probability[BitBoard::index(&test_move)] = other_prob;
-    //                }
-    //            }
-    //        }
-    //        //net.dumb_backward_prop(&state, target_probability, scaled_reward);
-    //        let grad = self.back_prop_pi(&state, target_probability, scaled_reward);
-    //        self.update(grad, -LEARNING_RATE);
-    //        ith_move += 2;
-    //    }
-    //}
 
     pub fn update(&mut self, grad: Gradient, r: f32) {
         self.net.update(grad, r);

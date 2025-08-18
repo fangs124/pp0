@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use chessbb::{GameResult, Side};
 use inquire::Select;
+use nnet::InputType;
 use termion::raw::IntoRawMode;
 use termion::{async_stdin, clear, cursor};
 
@@ -22,14 +23,14 @@ mod simulation;
 
 type GR = GameResult;
 
-const NODE_COUNT: [usize; 3] = [64, 64, 1];
+const NODE_COUNT: [usize; 3] = [128, 64, 1];
 const MAX_INSTANCE: usize = 24;
-const BATCH_SIZE: usize = 10000;
+const BATCH_SIZE: usize = 1000;
 const REVIEW_SIZE: usize = 1000;
-const UPDATE_PER_BATCH: usize = 10;
+const UPDATE_PER_BATCH: usize = 1;
 
 const LEARNING_RATE: f32 = 0.01;
-const FALLBACK_DEPTH: usize = 3;
+const FALLBACK_DEPTH: usize = 2;
 
 static INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0_usize);
 static RETURN_COUNT: AtomicUsize = AtomicUsize::new(0_usize);
@@ -209,34 +210,34 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
                         }
                     }
                 }
-
-                // review games finished
-                #[rustfmt::skip]
-                write!(stdout, "{}{}{}{}", cursor::Goto(1, 8), clear::CurrentLine, cursor::Goto(1, 9), clear::CurrentLine)?;
-                #[rustfmt::skip]
-                write!(stdout, "{}{}{}{}", cursor::Goto(1,10), clear::CurrentLine, cursor::Goto(1,11), clear::CurrentLine)?;
-                #[rustfmt::skip]
-                write!(stdout, "{}{}{}{}", cursor::Goto(1,12), clear::CurrentLine, cursor::Goto(1,13), clear::CurrentLine)?;
-
-                write!(stdout, "{}======= reviewing net v.{}! =======\n\r", cursor::Goto(1, 8), net.version)?;
-                let new_net_lose_rate = (r_scoreboard.losses as f32) / (review_match_count as f32);
-                #[rustfmt::skip]
-                write!(stdout, "new lose rate: {:.2}%, best lose rate: {:.2}%\n\r", new_net_lose_rate * 100.0, best_lose_rate * 100.0)?;
-
-                if new_net_lose_rate < best_lose_rate {
-                    best_lose_rate = new_net_lose_rate;
-                    enm = net.clone();
-                }
-
-                r_scoreboard.write(&mut stdout)?;
-                stream_out.flush()?;
-                f_buff.flush()?;
-                r_scoreboard.update();
-
-                r_scoreboard.net1_ver = net.version;
-                scoreboard.net1_ver = net.version;
-                scoreboard.net2_ver = enm.version;
             }
+
+            // review games finished
+            #[rustfmt::skip]
+            write!(stdout, "{}{}{}{}", cursor::Goto(1, 8), clear::CurrentLine, cursor::Goto(1, 9), clear::CurrentLine)?;
+            #[rustfmt::skip]
+            write!(stdout, "{}{}{}{}", cursor::Goto(1,10), clear::CurrentLine, cursor::Goto(1,11), clear::CurrentLine)?;
+            #[rustfmt::skip]
+            write!(stdout, "{}{}{}{}", cursor::Goto(1,12), clear::CurrentLine, cursor::Goto(1,13), clear::CurrentLine)?;
+
+            write!(stdout, "{}======= reviewing net v.{}! =======\n\r", cursor::Goto(1, 8), net.version)?;
+            let new_net_lose_rate = (r_scoreboard.losses as f32) / (review_match_count as f32);
+            #[rustfmt::skip]
+            write!(stdout, "new lose rate: {:.2}%, best lose rate: {:.2}%\n\r", new_net_lose_rate * 100.0, best_lose_rate * 100.0)?;
+
+            if new_net_lose_rate < best_lose_rate {
+                best_lose_rate = new_net_lose_rate;
+                enm = net.clone();
+            }
+
+            r_scoreboard.write(&mut stdout)?;
+            stream_out.flush()?;
+            f_buff.flush()?;
+            r_scoreboard.update();
+
+            r_scoreboard.net1_ver = net.version;
+            scoreboard.net1_ver = net.version;
+            scoreboard.net2_ver = enm.version;
         }
     }
     write!(stdout, "{}{}", clear::All, cursor::Goto(1, 1))?;

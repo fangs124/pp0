@@ -49,7 +49,6 @@ pub fn play(net: &mut ChessNet, enm: &mut ChessNet, tx: Sender<TrainingResult>, 
 
     let return_data: TrainingResult = TrainingResult { epoch, result, net_side, pairs };
     _ = tx.send(return_data);
-    todo!()
 }
 
 pub fn review_play(net: &mut ChessNet, enm: &mut ChessNet, tx: Sender<TrainingResult>, epoch: usize) {
@@ -78,5 +77,4 @@ pub fn review_play(net: &mut ChessNet, enm: &mut ChessNet, tx: Sender<TrainingRe
 
     let return_data: TrainingResult = TrainingResult { epoch, result, net_side, pairs: Vec::new() };
     _ = tx.send(return_data);
-    todo!()
 }
