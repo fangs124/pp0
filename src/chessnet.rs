@@ -1,5 +1,6 @@
 use chessbb::{ChessBoard, ChessMove, ChessPiece, Evaluator, GameResult, GameState, PieceType, Side, Square};
 use nalgebra::DVector;
+use rand::random_range;
 use serde::{Deserialize, Serialize};
 
 use crate::{nnet::*, simulation::TrainingResult, LEARNING_RATE};
@@ -92,6 +93,14 @@ impl ChessGame {
         };
         return (side * 64 * 6) + (piece_type * 64) + square.to_usize();
     }
+
+    #[inline(always)]
+    pub fn random_move(&self) -> ChessMove {
+        let moves = self.cb.generate_moves();
+        assert!(moves.len() > 0);
+        return moves[random_range(0..moves.len())]
+    }
+
 }
 
 impl ChessNet {

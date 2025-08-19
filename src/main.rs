@@ -12,7 +12,7 @@ use termion::{async_stdin, clear, cursor};
 
 use crate::chessnet::{ChessGame, ChessNet};
 use crate::scoreboard::ScoreBoard;
-use crate::simulation::{TrainingResult, play, review_play};
+use crate::simulation::{TrainingResult, play, play_rand, review_play, review_play_rand};
 
 extern crate chessbb;
 extern crate nnet;
@@ -25,8 +25,8 @@ type GR = GameResult;
 
 const NODE_COUNT: [usize; 3] = [128, 64, 1];
 const MAX_INSTANCE: usize = 24;
-const BATCH_SIZE: usize = 1000;
-const REVIEW_SIZE: usize = 1000;
+const BATCH_SIZE: usize = 10000;
+const REVIEW_SIZE: usize = 10000;
 const UPDATE_PER_BATCH: usize = 1;
 
 const LEARNING_RATE: f32 = 0.01;
@@ -104,6 +104,10 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
     let mut finish_count: usize = 0;
     let mut batch_count: usize = 0;
     let mut best_lose_rate: f32 = 100.0;
+
+    let mut is_stronger_than_rand = false;
+    let mut best_win_rate_rand: f32 = 0.0;
+
     loop {
         write!(stdout, "{}Press q to stop.{}\n\r", cursor::Goto(1, 1), cursor::Goto(1, 14))?;
         //listen to 'q' for interupt
@@ -120,10 +124,12 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             let mut new_enm: ChessNet = enm.clone();
             let new_tx = tx.clone();
             let new_epoch = scoreboard.epoch.clone();
-
+            let is_play_rand = !is_stronger_than_rand;
             rayon::spawn(move || {
-                //TODO
-                play(&mut new_net, &mut new_enm, new_tx, new_epoch);
+                match is_play_rand {
+                    true => play_rand(&mut new_net, new_tx, new_epoch),
+                    false => play(&mut new_net, &mut new_enm, new_tx, new_epoch),
+                };
                 INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                 RETURN_COUNT.fetch_add(1_usize, Ordering::SeqCst);
             });
@@ -169,8 +175,8 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             write!(stdout, "{}{}{}{}", cursor::Goto(1, 4), clear::CurrentLine, cursor::Goto(1, 5), clear::CurrentLine)?;
             write!(stdout, "{}{}{}{}", cursor::Goto(1, 6), clear::CurrentLine, cursor::Goto(1, 7), clear::CurrentLine)?;
             write!(stdout, "{}======== training result! ========\n\r", cursor::Goto(1, 2))?;
-            #[rustfmt::skip]
-            write!(stdout, "discarded {}, threads finished: {}\n\r", discarded_count, RETURN_COUNT.load(Ordering::SeqCst))?;
+            write!(stdout, "discarded {}, threads finished: {}", discarded_count, RETURN_COUNT.load(Ordering::SeqCst))?;
+            write!(stdout, ", stronger than rand: {}\n\r", is_stronger_than_rand)?;
             scoreboard.write(&mut stdout)?;
             scoreboard.write_to_buf(&mut f_buff)?;
             stream_out.flush()?;
@@ -190,9 +196,12 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
                     let mut new_enm: ChessNet = enm.clone();
                     let new_tx = tx_r.clone();
                     let new_epoch = r_scoreboard.epoch.clone();
-
+                    let is_play_rand = !is_stronger_than_rand;
                     rayon::spawn(move || {
-                        review_play(&mut new_net, &mut new_enm, new_tx, new_epoch);
+                        match is_play_rand {
+                            true => review_play_rand(&mut new_net, new_tx, new_epoch),
+                            false => review_play(&mut new_net, &mut new_enm, new_tx, new_epoch),
+                        }
                         INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                     });
                 }
@@ -221,12 +230,21 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             write!(stdout, "{}{}{}{}", cursor::Goto(1,12), clear::CurrentLine, cursor::Goto(1,13), clear::CurrentLine)?;
 
             write!(stdout, "{}======= reviewing net v.{}! =======\n\r", cursor::Goto(1, 8), net.version)?;
-            let new_net_lose_rate = (r_scoreboard.losses as f32) / (review_match_count as f32);
+            let new_win_rate: f32 = (r_scoreboard.wins as f32) / (review_match_count as f32);
+            let new_lose_rate: f32 = (r_scoreboard.losses as f32) / (review_match_count as f32);
+            if !is_stronger_than_rand && new_win_rate > best_win_rate_rand {
+                best_win_rate_rand = new_win_rate;
+            }
             #[rustfmt::skip]
-            write!(stdout, "new lose rate: {:.2}%, best lose rate: {:.2}%\n\r", new_net_lose_rate * 100.0, best_lose_rate * 100.0)?;
+            write!(stdout, "lose rate: {:.2}% (best: {:.2}%)", new_lose_rate * 100.0, best_lose_rate * 100.0, )?;
+            write!(stdout, ", best win rate: {:.2}\n\r", best_win_rate_rand)?;
 
-            if new_net_lose_rate < best_lose_rate {
-                best_lose_rate = new_net_lose_rate;
+            if !is_stronger_than_rand && best_win_rate_rand > 0.50 {
+                is_stronger_than_rand = true;
+            }
+
+            if new_lose_rate < best_lose_rate {
+                best_lose_rate = new_lose_rate;
                 enm = net.clone();
             }
 
