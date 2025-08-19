@@ -31,18 +31,23 @@ impl Evaluator for ChessNet {
 
 impl ChessGame {
     #[inline(always)]
-    pub fn start_pos() -> ChessGame {
+    pub const fn start_pos() -> ChessGame {
         return ChessGame { cb: ChessBoard::start_pos() };
     }
 
     #[inline(always)]
-    pub const fn new() -> ChessGame {
-        return ChessGame { cb: ChessBoard::start_pos() };
+    pub fn from_fen(input: &str) -> ChessGame {
+        return ChessGame { cb: ChessBoard::from_fen(input) };
     }
 
     #[inline(always)]
     pub fn try_generate_moves(&self) -> (Vec<ChessMove>, GameState) {
         return self.cb.try_generate_moves();
+    }
+
+    #[inline(always)]
+    pub fn generate_moves(&self) -> Vec<ChessMove> {
+        return self.cb.generate_moves();
     }
 
     #[inline(always)]
@@ -106,7 +111,7 @@ impl ChessGame {
 impl ChessNet {
     #[inline(always)]
     pub fn new(node_counts: Vec<usize>) -> Self {
-        let input_dim = ChessGame::new().to_vector().len();
+        let input_dim = ChessGame::start_pos().to_vector().len();
         ChessNet { net: Network::new(input_dim, node_counts), version: 0 }
     }
 
@@ -172,9 +177,9 @@ impl ChessNet {
         /* maybe isolate this? */
         for (input, output) in data.pairs {
             let scaled_reward = reward * compute_scalar(ith_move, total_moves);
-            let target_output = DVector::from_element(1, 1.0);
+            let target_output = DVector::from_element(1, scaled_reward);
             
-            let grad = self.back_prop_vector(input, target_output, scaled_reward);
+            let grad = self.back_prop_vector(input, target_output, 1.0);
             self.update(grad, -LEARNING_RATE);
             ith_move += 2;
         }

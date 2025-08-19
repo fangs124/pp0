@@ -20,13 +20,14 @@ extern crate nnet;
 mod chessnet;
 mod scoreboard;
 mod simulation;
+mod uci;
 
 type GR = GameResult;
 
 const NODE_COUNT: [usize; 3] = [128, 64, 1];
 const MAX_INSTANCE: usize = 24;
 const BATCH_SIZE: usize = 10000;
-const REVIEW_SIZE: usize = 10000;
+const REVIEW_SIZE: usize = 1000;
 const UPDATE_PER_BATCH: usize = 1;
 
 const LEARNING_RATE: f32 = 0.01;
@@ -41,7 +42,20 @@ enum State {
     Quit,
 }
 
+const IS_ALT: bool = false;
+fn alt_main() -> std::io::Result<()> {
+    let file = File::open(format!("{:?}value_net.json", NODE_COUNT))?;
+    let mut buf_reader = BufReader::new(file);
+    let mut contents = String::new();
+    buf_reader.read_to_string(&mut contents)?;
+    let mut chessnet: ChessNet = serde_json::from_str(&contents).unwrap();
+    chessnet.uci_loop_start()?;
+    Ok(())
+}
 fn main() -> std::io::Result<()> {
+    if IS_ALT {
+        alt_main()?
+    }
     let mut is_quit = false;
 
     //load or new
@@ -124,12 +138,8 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             let mut new_enm: ChessNet = enm.clone();
             let new_tx = tx.clone();
             let new_epoch = scoreboard.epoch.clone();
-            let is_play_rand = !is_stronger_than_rand;
             rayon::spawn(move || {
-                match is_play_rand {
-                    true => play_rand(&mut new_net, new_tx, new_epoch),
-                    false => play(&mut new_net, &mut new_enm, new_tx, new_epoch),
-                };
+                play(&mut new_net, &mut new_enm, new_tx, new_epoch);
                 INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                 RETURN_COUNT.fetch_add(1_usize, Ordering::SeqCst);
             });
@@ -232,8 +242,9 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             write!(stdout, "{}======= reviewing net v.{}! =======\n\r", cursor::Goto(1, 8), net.version)?;
             let new_win_rate: f32 = (r_scoreboard.wins as f32) / (review_match_count as f32);
             let new_lose_rate: f32 = (r_scoreboard.losses as f32) / (review_match_count as f32);
-            if !is_stronger_than_rand && new_win_rate > best_win_rate_rand {
+            if new_win_rate > best_win_rate_rand {
                 best_win_rate_rand = new_win_rate;
+                enm = net.clone();
             }
             #[rustfmt::skip]
             write!(stdout, "lose rate: {:.2}% (best: {:.2}%)", new_lose_rate * 100.0, best_lose_rate * 100.0, )?;
