@@ -1,4 +1,4 @@
-use chessbb::{ChessBoard, ChessMove, ChessPiece, Evaluator, GameResult, GameState, PieceType, Side, Square};
+use chessbb::{ChessBoard, ChessBoardCore, ChessMove, ChessPiece, Evaluator, GameResult, GameState, PieceType, Side, Square, MATERIAL_EVAL};
 use nalgebra::DVector;
 use rand::random_range;
 use serde::{Deserialize, Serialize};
@@ -45,28 +45,22 @@ impl ChessGame {
         return self.cb.try_generate_moves();
     }
 
-    #[inline(always)]
-    pub fn generate_moves(&self) -> Vec<ChessMove> {
-        return self.cb.generate_moves();
-    }
-
-    #[inline(always)]
-    pub fn state(&self) -> GameState {
-        return self.cb.state();
-    }
+    //#[inline(always)]
+    //pub fn state(&self) -> GameState {
+    //    return self.cb.state();
+    //}
     
     #[inline(always)]
-    pub fn update_state(&mut self, chessmove: ChessMove) {
-        self.cb.update_state(chessmove);
+    pub fn update_state(&mut self, chess_move: ChessMove) {
+        self.cb.update_state(chess_move);
     }
     
     #[rustfmt::skip]
     #[inline(always)]
     pub fn negamax(&mut self, a: i32, b: i32, d: usize, net: &mut ChessNet) -> (i32, Option<ChessMove>) {
-        return self.cb.negamax(a, b, d, net);
+        return self.cb.negamax(a, b, d, 0,net);
     }
 
-    
     #[inline(always)]
     pub fn side(&self) -> Side {
         self.cb.side()
@@ -125,7 +119,7 @@ impl ChessGame {
 
     #[inline(always)]
     pub fn random_move(&self) -> ChessMove {
-        let moves = self.cb.generate_moves();
+        let moves = self.cb.try_generate_moves().0;
         assert!(moves.len() > 0);
         return moves[random_range(0..moves.len())]
     }
@@ -161,29 +155,44 @@ impl ChessNet {
         self.net.phi_z()
     }
     
-    pub fn negamax_learn(&mut self, cg: &ChessGame, d: usize, ins: &mut Vec<DVector<f32>>,  outs: &mut Vec<DVector<f32>>) -> ChessMove {
-        //TODO determine if clone is necessary here
-        //TODO safety of the return result?
+    pub fn negamax_learn(&mut self, cg: &ChessGame, d: usize, ins: &mut Vec<DVector<f32>>,  outs: &mut Vec<DVector<f32>>, moves: Vec<ChessMove>) -> ChessMove {
         ins.push(cg.to_vector());
         outs.push(self.eval(&cg));
-        cg.clone().negamax(i32::MIN + 1, i32::MAX - 1, d, self).1.unwrap()
+        return self.negamax(cg, d, moves);
     }
    
+ 
 
-    pub fn negamax(&mut self, cg: &ChessGame, d: usize) -> ChessMove {
-        //TODO determine if clone is necessary here
+    pub fn negamax_cold(&mut self, cg: &ChessGame, d: usize) -> ChessMove {
         //TODO safety of the return result?
-        cg.clone().negamax(i32::MIN + 1, i32::MAX - 1, d, self).1.unwrap()
+        cg.clone().cb.negamax(i32::MIN + 1, i32::MAX - 1, d, 0,self).1.unwrap()
     }
 
-    //pub fn get_eval_fn(&self) -> impl Fn(&ChessBoard) -> i32 + use<> {
-    //    let net = self.net.clone();
-    //    move |cb: &ChessBoard| {
-    //        let output = net.forward_prop_phi_mutless(&ChessGame { cb: *cb });
-    //        //let output = net.phi_z();
-    //        return (output[0] * 1000.0) as i32;
-    //    }
+    //TODO remove this
+    //pub fn negamax_sanity_test(&mut self, cg: &ChessGame, d: usize) -> ChessMove {
+    //    cg.clone().cb.negamax(i32::MIN + 1, i32::MAX - 1, d, 0,&mut MATERIAL_EVAL).1.unwrap()
     //}
+
+    pub fn negamax(&mut self, cg: &ChessGame, d: usize, moves: Vec<ChessMove>) ->ChessMove {
+        assert!(!moves.is_empty());
+        let mut alpha:i32 = i32::MIN + 1;
+        let beta:i32 = i32::MAX - 1;
+        let mut best_move: ChessMove = moves[0].clone(); 
+        let mut chess_game = cg.clone();
+        for chess_move in moves {
+            //let old_core: ChessBoardCore = chess_game.cb.core.clone();
+            let snapshot = chess_game.cb.explore_state(chess_move);
+            let (neg_score, next_move) = chess_game.cb.negamax(-beta, -alpha, d-1, 1,self);
+            let score = -neg_score;
+            chess_game.cb.restore_state(snapshot);
+
+            if score > alpha {
+                alpha = score;
+                best_move = chess_move;
+            }
+        }
+        return best_move;
+    }
 
      pub fn process_training_result(&mut self, data: TrainingResult) {
         let total_moves = data.pairs.len();
@@ -211,10 +220,6 @@ impl ChessNet {
 
     pub fn update(&mut self, grad: Gradient, r: f32) {
         self.net.update(grad, r);
-    }
-
-    pub fn update_sum(&mut self, pairs: &mut Vec<(Gradient, f32)>) {
-        self.net.update_sum(pairs);
     }
 
     //greedy

@@ -65,7 +65,7 @@ fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
                 _ => panic!("unknown command"),
             }
         } else {
-            for chess_move in chessgame.generate_moves() {
+            for chess_move in chessgame.try_generate_moves().0 {
                 if chess_move.print_move() == cmd {
                     //todo: maybe parse into a source/target and do int compare
                     chessgame.update_state(chess_move);
@@ -95,5 +95,5 @@ pub fn uci_go(chessgame: &mut ChessGame, cmd_str: &str, net: &mut ChessNet) -> S
         //other cases?
     }
     //search_position(depth)
-    return format!("bestmove {}", net.negamax(chessgame, depth).print_move());
+    return format!("bestmove {}", net.negamax_cold(chessgame, depth).print_move());
 }

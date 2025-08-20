@@ -4,7 +4,7 @@ use chessbb::{ChessMove, GameResult, GameState, Side};
 use itertools::interleave;
 use nalgebra::DVector;
 use nnet::{Gradient, InputType};
-use rand::Rng;
+use rand::{Rng, random_bool};
 
 use crate::{
     FALLBACK_DEPTH,
@@ -18,30 +18,27 @@ pub struct TrainingResult {
     pub pairs: Vec<(DVector<f32>, DVector<f32>)>, //(input,output)
 }
 
-pub fn play(net: &mut ChessNet, enm: &mut ChessNet, tx: Sender<TrainingResult>, epoch: usize) {
-    let mut chessgame = ChessGame::start_pos();
-    let mut rng = rand::rng();
-    let is_net_white = rng.random_bool(0.5);
+pub struct TrainingResultSanityTest {
+    pub epoch: usize,
+    pub result: GameResult,
+    pub net_side: Side,
+    pub pairs: Vec<(DVector<f32>, DVector<f32>)>, //(input,output)
+    pub chessmoves: Vec<ChessMove>,
+}
 
-    let mut input_vec: Vec<DVector<f32>> = Vec::new();
-    let mut output_vec: Vec<DVector<f32>> = Vec::new();
-    //let mut chessmove_vec: Vec<ChessMove> = Vec::new();
-
-    // play game
-    while chessgame.state() == GameState::Ongoing {
-        let active_side = chessgame.side();
-        let chessmove: ChessMove;
-        chessmove = match is_net_white == (active_side == Side::White) {
-            true => net.negamax_learn(&chessgame, FALLBACK_DEPTH, &mut input_vec, &mut output_vec),
-            false => enm.negamax(&chessgame, FALLBACK_DEPTH),
-        };
-
-        chessgame.update_state(chessmove);
+pub fn play(net: ChessNet, enm: Option<ChessNet>, tx: Sender<TrainingResult>, epoch: usize, is_learn: bool) {
+    let is_net_white = random_bool(0.5);
+    let result: GameResult;
+    let mut pairs: Vec<(DVector<f32>, DVector<f32>)> = Vec::new();
+    match is_learn {
+        true => {
+            (result, pairs) = learn_game(net, enm, is_net_white);
+        }
+        false => {
+            result = play_game(net, enm, is_net_white);
+        }
     }
 
-    // game ended
-    let GameState::Finished(result) = chessgame.state() else { unreachable!() };
-    let pairs: Vec<(DVector<f32>, DVector<f32>)> = input_vec.into_iter().zip(output_vec).collect();
     let net_side: Side = match is_net_white {
         true => Side::White,
         false => Side::Black,
@@ -51,91 +48,106 @@ pub fn play(net: &mut ChessNet, enm: &mut ChessNet, tx: Sender<TrainingResult>, 
     _ = tx.send(return_data);
 }
 
-pub fn play_rand(net: &mut ChessNet, tx: Sender<TrainingResult>, epoch: usize) {
-    let mut chessgame = ChessGame::start_pos();
-    let mut rng = rand::rng();
-    let is_net_white = rng.random_bool(0.5);
-
-    let mut input_vec: Vec<DVector<f32>> = Vec::new();
-    let mut output_vec: Vec<DVector<f32>> = Vec::new();
-    //let mut chessmove_vec: Vec<ChessMove> = Vec::new();
+fn play_game(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: bool) -> GameResult {
+    let mut chess_game = ChessGame::start_pos();
+    let (mut moves, mut game_state) = chess_game.try_generate_moves();
 
     // play game
-    while chessgame.state() == GameState::Ongoing {
-        let active_side = chessgame.side();
-        let chessmove: ChessMove;
-        chessmove = match is_net_white == (active_side == Side::White) {
-            true => net.negamax_learn(&chessgame, FALLBACK_DEPTH, &mut input_vec, &mut output_vec),
-            false => chessgame.random_move(),
-        };
+    match enm.is_some() {
+        true => {
+            let mut enm = enm.unwrap();
+            while game_state == GameState::Ongoing {
+                let chessmove: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
+                    true => net.negamax(&chess_game, FALLBACK_DEPTH, moves),
+                    false => enm.negamax(&chess_game, FALLBACK_DEPTH, moves),
+                };
 
-        chessgame.update_state(chessmove);
+                chess_game.update_state(chessmove);
+                (moves, game_state) = chess_game.try_generate_moves();
+            }
+        }
+        false => {
+            while game_state == GameState::Ongoing {
+                let chessmove: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
+                    true => net.negamax(&chess_game, FALLBACK_DEPTH, moves),
+                    false => chess_game.random_move(),
+                };
+
+                chess_game.update_state(chessmove);
+                (moves, game_state) = chess_game.try_generate_moves();
+            }
+        }
     }
 
-    // game ended
-    let GameState::Finished(result) = chessgame.state() else { unreachable!() };
-    let pairs: Vec<(DVector<f32>, DVector<f32>)> = input_vec.into_iter().zip(output_vec).collect();
-    let net_side: Side = match is_net_white {
-        true => Side::White,
-        false => Side::Black,
-    };
-
-    let return_data: TrainingResult = TrainingResult { epoch, result, net_side, pairs };
-    _ = tx.send(return_data);
+    let GameState::Finished(result) = game_state else { unreachable!() };
+    return result;
 }
 
-pub fn review_play(net: &mut ChessNet, enm: &mut ChessNet, tx: Sender<TrainingResult>, epoch: usize) {
-    let mut chessgame = ChessGame::start_pos();
-    let mut rng = rand::rng();
-    let is_net_white = rng.random_bool(0.5);
-
+#[rustfmt::skip]
+fn learn_game(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: bool) -> (GameResult, Vec<(DVector<f32>, DVector<f32>)>) {
+    let mut chess_game = ChessGame::start_pos();
+    let (mut moves, mut game_state) = chess_game.try_generate_moves();
+    let mut ins: Vec<DVector<f32>> = Vec::new();
+    let mut outs: Vec<DVector<f32>> = Vec::new();
     // play game
-    while chessgame.state() == GameState::Ongoing {
-        let active_side = chessgame.side();
-        let chessmove: ChessMove;
-        chessmove = match is_net_white == (active_side == Side::White) {
-            true => net.negamax(&chessgame, FALLBACK_DEPTH),
-            false => enm.negamax(&chessgame, FALLBACK_DEPTH),
-        };
+    match enm.is_some() {
+        true => {
+            let mut enm = enm.unwrap();
+            while game_state == GameState::Ongoing {
+                let chessmove: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
+                    true => net.negamax_learn(&chess_game, FALLBACK_DEPTH, &mut ins, &mut outs, moves),
+                    false => enm.negamax(&chess_game, FALLBACK_DEPTH, moves),
+                };
 
-        chessgame.update_state(chessmove);
+                chess_game.update_state(chessmove);
+                (moves, game_state) = chess_game.try_generate_moves();
+            }
+        }
+        false => {
+            while game_state == GameState::Ongoing {
+                let chessmove: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
+                    true => net.negamax_learn(&chess_game, FALLBACK_DEPTH, &mut ins, &mut outs, moves),
+                    false => chess_game.random_move(),
+                };
+
+                chess_game.update_state(chessmove);
+                (moves, game_state) = chess_game.try_generate_moves();
+            }
+        }
     }
 
-    // game ended
-    let GameState::Finished(result) = chessgame.state() else { unreachable!() };
-    let net_side: Side = match is_net_white {
-        true => Side::White,
-        false => Side::Black,
-    };
-
-    let return_data: TrainingResult = TrainingResult { epoch, result, net_side, pairs: Vec::new() };
-    _ = tx.send(return_data);
+    let GameState::Finished(result) = game_state else { unreachable!() };
+    return (result, ins.into_iter().zip(outs).collect());
 }
 
-pub fn review_play_rand(net: &mut ChessNet, tx: Sender<TrainingResult>, epoch: usize) {
-    let mut chessgame = ChessGame::start_pos();
-    let mut rng = rand::rng();
-    let is_net_white = rng.random_bool(0.5);
-
-    // play game
-    while chessgame.state() == GameState::Ongoing {
-        let active_side = chessgame.side();
-        let chessmove: ChessMove;
-        chessmove = match is_net_white == (active_side == Side::White) {
-            true => net.negamax(&chessgame, FALLBACK_DEPTH),
-            false => chessgame.random_move(),
-        };
-
-        chessgame.update_state(chessmove);
-    }
-
-    // game ended
-    let GameState::Finished(result) = chessgame.state() else { unreachable!() };
-    let net_side: Side = match is_net_white {
-        true => Side::White,
-        false => Side::Black,
-    };
-
-    let return_data: TrainingResult = TrainingResult { epoch, result, net_side, pairs: Vec::new() };
-    _ = tx.send(return_data);
-}
+//TODO remove this
+//pub fn sanity_test(net: &mut ChessNet, tx: Sender<TrainingResultSanityTest>, epoch: usize) {
+//    let mut chess_game = ChessGame::start_pos();
+//    let mut rng = rand::rng();
+//    let is_net_white = rng.random_bool(0.5);
+//
+//    let mut chessmoves: Vec<ChessMove> = Vec::new();
+//    let (mut moves, mut game_state) = chess_game.try_generate_moves();
+//
+//    // play game
+//    while game_state == GameState::Ongoing {
+//        let chessmove = match is_net_white == (chess_game.side() == Side::White) {
+//            true => net.negamax_sanity_test(&chess_game, FALLBACK_DEPTH),
+//            false => chess_game.random_move(),
+//        };
+//
+//        chess_game.update_state(chessmove.clone());
+//        chessmoves.push(chessmove);
+//    }
+//
+//    // game ended
+//    let GameState::Finished(result) = game_state else { panic!() };
+//    let net_side: Side = match is_net_white {
+//        true => Side::White,
+//        false => Side::Black,
+//    };
+//
+//    let return_data: TrainingResultSanityTest =
+//        TrainingResultSanityTest { epoch, result, net_side, pairs: Vec::new(), chessmoves };
+//    _ = tx.send(return_data);
+//}
