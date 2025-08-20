@@ -75,9 +75,17 @@ impl ChessGame {
     fn encode(&self) -> [f32; 768] {
         //position is always encoded from active side's presepctive
         let mut input_data: [f32; 768] = [0.0; 768];
-        for (chesspiece, i) in self.cb.mailbox_iterator().zip(0u8..64) {
+        for (chesspiece, i) in self.cb.mailbox_iterator().zip(0usize..64) {
             if let Some(chesspiece) = chesspiece {
-                input_data[ChessGame::index(*chesspiece, Square::new(i))] = 1.0;
+                match self.side() {
+                    Side::White => {
+                        input_data[ChessGame::index(*chesspiece, Square::nth(i))] = 1.0;
+                    },
+                    Side::Black => {
+                        input_data[ChessGame::index_flip(*chesspiece,Square::nth(i))] = 1.0;
+                    },
+                }
+                
             }
         }
         return input_data;
@@ -97,6 +105,22 @@ impl ChessGame {
             PieceType::Pawn => 5,
         };
         return (side * 64 * 6) + (piece_type * 64) + square.to_usize();
+    }
+
+    fn index_flip(chesspiece: ChessPiece, square: Square) -> usize {
+        let side = match chesspiece.0 {
+            Side::White => 1,
+            Side::Black => 0,
+        };
+        let piece_type = match chesspiece.1 {
+            PieceType::King => 0,
+            PieceType::Queen => 1,
+            PieceType::Knight => 2,
+            PieceType::Bishop => 3,
+            PieceType::Rook => 4,
+            PieceType::Pawn => 5,
+        };
+        return (side * 64 * 6) + (piece_type * 64) + Square::nth_flipped(square.to_usize()).to_usize();
     }
 
     #[inline(always)]
@@ -177,9 +201,9 @@ impl ChessNet {
         /* maybe isolate this? */
         for (input, output) in data.pairs {
             let scaled_reward = reward * compute_scalar(ith_move, total_moves);
-            let target_output = DVector::from_element(1, scaled_reward);
+            let target_output = DVector::from_element(1, reward);
             
-            let grad = self.back_prop_vector(input, target_output, 1.0);
+            let grad = self.back_prop_vector(input, target_output, scaled_reward);
             self.update(grad, -LEARNING_RATE);
             ith_move += 2;
         }

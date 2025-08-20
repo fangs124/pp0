@@ -26,12 +26,12 @@ type GR = GameResult;
 
 const NODE_COUNT: [usize; 3] = [128, 64, 1];
 const MAX_INSTANCE: usize = 24;
-const BATCH_SIZE: usize = 10000;
+const BATCH_SIZE: usize = 1000;
 const REVIEW_SIZE: usize = 1000;
 const UPDATE_PER_BATCH: usize = 1;
 
 const LEARNING_RATE: f32 = 0.01;
-const FALLBACK_DEPTH: usize = 2;
+const FALLBACK_DEPTH: usize = 3;
 
 static INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0_usize);
 static RETURN_COUNT: AtomicUsize = AtomicUsize::new(0_usize);
@@ -133,13 +133,16 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
         //launch a game if there are idle threads
         if INSTANCE_COUNT.load(Ordering::SeqCst) <= MAX_INSTANCE {
             INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
-
             let mut new_net: ChessNet = net.clone();
             let mut new_enm: ChessNet = enm.clone();
             let new_tx = tx.clone();
             let new_epoch = scoreboard.epoch.clone();
+            let new_is_stronger_than_rand = is_stronger_than_rand.clone();
             rayon::spawn(move || {
-                play(&mut new_net, &mut new_enm, new_tx, new_epoch);
+                match new_is_stronger_than_rand {
+                    true => play(&mut new_net, &mut new_enm, new_tx, new_epoch),
+                    false => play_rand(&mut new_net, new_tx, new_epoch),
+                }
                 INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                 RETURN_COUNT.fetch_add(1_usize, Ordering::SeqCst);
             });
@@ -192,7 +195,6 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             stream_out.flush()?;
             f_buff.flush()?;
             scoreboard.update();
-
             //review if net is stronger
             let (tx_r, rx_r) = mpsc::channel::<TrainingResult>();
             let mut review_match_count: usize = 0;
