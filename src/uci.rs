@@ -40,7 +40,7 @@ impl ChessNet {
             buffer.clear();
         }
 
-        Ok(())
+        return Ok(());
     }
 }
 
@@ -95,5 +95,5 @@ pub fn uci_go(chessgame: &mut ChessGame, cmd_str: &str, net: &mut ChessNet) -> S
         //other cases?
     }
     //search_position(depth)
-    format!("bestmove {}", net.negamax_cold(chessgame, depth).print_move())
+    return format!("bestmove {}", net.negamax_cold(chessgame, depth).print_move());
 }

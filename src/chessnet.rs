@@ -1,6 +1,6 @@
 use chessbb::{
-    ChessBoard, ChessMove, ChessPiece, Evaluator, GameResult, GameState, PieceType,
-    Side, Square,
+    ChessBoard, ChessBoardCore, ChessMove, ChessPiece, Evaluator, GameResult, GameState, MATERIAL_EVAL, PieceType,
+    Side, Square, TranspositionTable,
 };
 use nalgebra::DVector;
 use rand::{random_bool, random_range};
@@ -24,7 +24,7 @@ pub struct ChessNet {
 
 impl InputType for ChessGame {
     fn to_vector(&self) -> DVector<f32> {
-        DVector::<f32>::from_vec(self.encode().to_vec())
+        return DVector::<f32>::from_vec(self.encode().to_vec());
     }
 }
 
@@ -32,7 +32,7 @@ impl Evaluator for ChessNet {
     //TODO fix this so that its not horridly expensive
     fn eval(&mut self, cb: &ChessBoard) -> i16 {
         self.net.forward_prop_vector(ChessGame::vectorize(cb));
-        (self.phi_z()[0] * 1000.0) as i16
+        return (self.phi_z()[0] * 1000.0) as i16;
     }
 }
 
@@ -43,17 +43,17 @@ type DVf32 = DVector<f32>;
 impl ChessGame {
     #[inline(always)]
     pub fn start_pos() -> ChessGame {
-        ChessGame { cb: ChessBoard::start_pos() }
+        return ChessGame { cb: ChessBoard::start_pos() };
     }
 
     #[inline(always)]
     pub fn from_fen(input: &str) -> ChessGame {
-        ChessGame { cb: ChessBoard::from_fen(input) }
+        return ChessGame { cb: ChessBoard::from_fen(input) };
     }
 
     #[inline(always)]
     pub fn try_generate_moves(&self) -> (Vec<ChessMove>, GameState) {
-        self.cb.try_generate_moves()
+        return self.cb.try_generate_moves();
     }
 
     //#[inline(always)]
@@ -80,7 +80,7 @@ impl ChessGame {
     #[inline(always)]
     fn encode(&self) -> [f32; 768] {
         //position is always encoded from active side's presepctive
-        ChessGame::encode_raw(&self.cb)
+        return ChessGame::encode_raw(&self.cb);
     }
 
     fn index(chesspiece: ChessPiece, square: Square) -> usize {
@@ -96,7 +96,7 @@ impl ChessGame {
             PieceType::Rook => 4,
             PieceType::Pawn => 5,
         };
-        (side * 64 * 6) + (piece_type * 64) + square.to_usize()
+        return (side * 64 * 6) + (piece_type * 64) + square.to_usize();
     }
 
     fn index_flip(chesspiece: ChessPiece, square: Square) -> usize {
@@ -112,18 +112,18 @@ impl ChessGame {
             PieceType::Rook => 4,
             PieceType::Pawn => 5,
         };
-        (side * 64 * 6) + (piece_type * 64) + Square::nth_flipped(square.to_usize()).to_usize()
+        return (side * 64 * 6) + (piece_type * 64) + Square::nth_flipped(square.to_usize()).to_usize();
     }
 
     #[inline(always)]
     pub fn random_move(&self) -> ChessMove {
         let moves = self.cb.try_generate_moves().0;
-        assert!(!moves.is_empty());
-        moves[random_range(0..moves.len())]
+        assert!(moves.len() > 0);
+        return moves[random_range(0..moves.len())];
     }
 
     fn vectorize(cb: &ChessBoard) -> DVector<f32> {
-        DVector::<f32>::from_vec(ChessGame::encode_raw(cb).to_vec())
+        return DVector::<f32>::from_vec(ChessGame::encode_raw(&cb).to_vec());
     }
 
     fn encode_raw(cb: &ChessBoard) -> [f32; 768] {
@@ -141,7 +141,7 @@ impl ChessGame {
                 }
             }
         }
-        input_data
+        return input_data;
     }
 }
 
@@ -155,7 +155,7 @@ impl ChessNet {
     #[inline(always)]
     pub fn eval(&mut self, cg: &ChessGame) -> DVector<f32> {
         self.net.forward_prop(cg);
-        self.net.phi_z_vector()
+        return self.net.phi_z_vector();
     }
 
     #[inline(always)]
@@ -187,7 +187,7 @@ impl ChessNet {
         assert!(!moves.is_empty());
         let mut alpha: i16 = i16::MIN + 1;
         let beta: i16 = i16::MAX - 1;
-        let mut best_move: ChessMove = moves[0];
+        let mut best_move: ChessMove = moves[0].clone();
         let mut chess_game: ChessGame = cg.clone();
         let mut action_values: Vec<(ChessMove, i16)> = moves.iter().map(|&x| (x, i16::MIN + 1)).collect();
         for depth in 0..=d {
@@ -208,7 +208,7 @@ impl ChessNet {
 
             action_values.sort_by(|(_, av), (_, bv)| av.cmp(bv));
         }
-        best_move
+        return best_move;
     }
 
     pub fn negamax_learn(
@@ -220,8 +220,8 @@ impl ChessNet {
         moves: Vec<ChessMove>,
     ) -> ChessMove {
         ins.push(cg.to_vector());
-        outs.push(self.eval(cg));
-        self.negamax(cg, d, moves)
+        outs.push(self.eval(&cg));
+        return self.negamax(cg, d, moves);
     }
 
     pub fn negamax_epsilon(&mut self, cg: &ChessGame, d: usize, moves: Vec<ChessMove>) -> ChessMove {
@@ -229,7 +229,7 @@ impl ChessNet {
         if random_bool(EPSILON) {
             return moves[random_range(0..moves.len())];
         }
-        self.negamax(cg, d, moves)
+        return self.negamax(cg, d, moves);
     }
 
     pub fn negamax_learn_epsilon(
@@ -241,8 +241,8 @@ impl ChessNet {
         moves: Vec<ChessMove>,
     ) -> ChessMove {
         ins.push(cg.to_vector());
-        outs.push(self.eval(cg));
-        self.negamax_epsilon(cg, d, moves)
+        outs.push(self.eval(&cg));
+        return self.negamax_epsilon(cg, d, moves);
     }
 
     pub fn process_training_result(&mut self, data: TrainingResult) {
@@ -311,5 +311,5 @@ fn compute_scalar(index: usize, total: usize) -> f32 {
 
 #[inline(always)]
 fn negate(pair: (i16, Option<ChessMove>)) -> (i16, Option<ChessMove>) {
-    (-pair.0, pair.1)
+    return (-pair.0, pair.1);
 }
