@@ -12,7 +12,7 @@ use termion::{async_stdin, clear, cursor};
 
 use crate::chessnet::{ChessGame, ChessNet};
 use crate::scoreboard::ScoreBoard;
-use crate::simulation::{TrainingResult, TrainingResultSanityTest, play};
+use crate::simulation::{TrainingResult, play};
 
 extern crate chessbb;
 extern crate nnet;
@@ -52,7 +52,9 @@ fn alt_main() -> std::io::Result<()> {
     chessnet.uci_loop_start()?;
     Ok(())
 }
+//fn main() -> std::io::Result<()> {
 fn main() -> std::io::Result<()> {
+    unsafe { std::env::set_var("RUST_BACKTRACE", "1") };
     if IS_ALT {
         alt_main()?
     }
@@ -120,7 +122,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
     let mut best_lose_rate: f32 = 100.0;
 
     let mut is_stronger_than_rand = false;
-    let mut best_win_rate_rand: f32 = 0.0;
+    let mut best_win_rate: f32 = 0.0;
 
     loop {
         write!(stdout, "{}Press q to stop.{}\n\r", cursor::Goto(1, 1), cursor::Goto(1, 14))?;
@@ -242,21 +244,23 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             write!(stdout, "{}======= reviewing net v.{}! =======\n\r", cursor::Goto(1, 8), net.version)?;
             let new_win_rate: f32 = (r_scoreboard.wins as f32) / (review_match_count as f32);
             let new_lose_rate: f32 = (r_scoreboard.losses as f32) / (review_match_count as f32);
-            if new_win_rate > best_win_rate_rand {
-                best_win_rate_rand = new_win_rate;
+            if new_win_rate > best_win_rate {
+                best_win_rate = new_win_rate;
                 enm = net.clone();
             }
             #[rustfmt::skip]
             write!(stdout, "lose rate: {:.2}% (best: {:.2}%)", new_lose_rate * 100.0, best_lose_rate * 100.0, )?;
-            write!(stdout, ", best win rate: {:.2}\n\r", best_win_rate_rand)?;
-
-            if !is_stronger_than_rand && best_win_rate_rand > 0.50 {
-                is_stronger_than_rand = true;
-            }
+            write!(stdout, ", best win rate: {:.2}\n\r", best_win_rate)?;
 
             if new_lose_rate < best_lose_rate {
                 best_lose_rate = new_lose_rate;
                 enm = net.clone();
+            }
+
+            if !is_stronger_than_rand && best_win_rate > 0.50 {
+                is_stronger_than_rand = true;
+                best_lose_rate = 100.0;
+                best_win_rate = 0.0;
             }
 
             r_scoreboard.write(&mut stdout)?;
@@ -270,8 +274,9 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
         }
     }
     write!(stdout, "{}{}", clear::All, cursor::Goto(1, 1))?;
+    let enm_file = File::create(format!("{:?}value_net_enm.json", NODE_COUNT))?;
+    serde_json::to_writer(enm_file, &enm)?;
     stdout.flush()?;
-    *net = enm.clone();
     Ok(())
 }
 

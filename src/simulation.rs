@@ -1,15 +1,11 @@
 use std::sync::mpsc::Sender;
 
-use chessbb::{ChessMove, GameResult, GameState, Side};
-use itertools::interleave;
-use nalgebra::DVector;
-use nnet::{Gradient, InputType};
-use rand::{Rng, random_bool};
-
 use crate::{
     FALLBACK_DEPTH,
     chessnet::{ChessGame, ChessNet},
 };
+use chessbb::{ChessMove, GameResult, GameState, Side};
+use nalgebra::DVector;
 
 pub struct TrainingResult {
     pub epoch: usize,
@@ -18,16 +14,16 @@ pub struct TrainingResult {
     pub pairs: Vec<(DVector<f32>, DVector<f32>)>, //(input,output)
 }
 
-pub struct TrainingResultSanityTest {
-    pub epoch: usize,
-    pub result: GameResult,
-    pub net_side: Side,
-    pub pairs: Vec<(DVector<f32>, DVector<f32>)>, //(input,output)
-    pub chessmoves: Vec<ChessMove>,
-}
+//pub struct TrainingResultSanityTest {
+//    pub epoch: usize,
+//    pub result: GameResult,
+//    pub net_side: Side,
+//    pub pairs: Vec<(DVector<f32>, DVector<f32>)>, //(input,output)
+//    pub chessmoves: Vec<ChessMove>,
+//}
 
 pub fn play(net: ChessNet, enm: Option<ChessNet>, tx: Sender<TrainingResult>, epoch: usize, is_learn: bool) {
-    let is_net_white = random_bool(0.5);
+    let is_net_white = rand::random_bool(0.5);
     let result: GameResult;
     let mut pairs: Vec<(DVector<f32>, DVector<f32>)> = Vec::new();
     match is_learn {
@@ -95,8 +91,8 @@ fn learn_game(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: bool) -> (
             let mut enm = enm.unwrap();
             while game_state == GameState::Ongoing {
                 let chessmove: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-                    true => net.negamax_learn(&chess_game, FALLBACK_DEPTH, &mut ins, &mut outs, moves),
-                    false => enm.negamax(&chess_game, FALLBACK_DEPTH, moves),
+                    true => net.negamax_learn_epsilon(&chess_game, FALLBACK_DEPTH, &mut ins, &mut outs, moves),
+                    false => enm.negamax_epsilon(&chess_game, FALLBACK_DEPTH, moves),
                 };
 
                 chess_game.update_state(chessmove);
