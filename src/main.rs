@@ -1,16 +1,14 @@
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write, stdout};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
-use std::time::Duration;
 
-use chessbb::{ChessMove, GameResult, Side};
+use chessbb::{GameResult, Side};
 use inquire::Select;
-use nnet::InputType;
 use termion::raw::IntoRawMode;
 use termion::{async_stdin, clear, cursor};
 
-use crate::chessnet::{ChessGame, ChessNet};
+use crate::chessnet::ChessNet;
 use crate::scoreboard::ScoreBoard;
 use crate::simulation::{TrainingResult, play};
 
@@ -73,10 +71,10 @@ fn main() -> std::io::Result<()> {
     };
 
     let mut state: State = State::Train;
-    while is_quit == false {
+    while !is_quit {
         match state {
             State::Quit => {
-                if prompt_quit().prompt().unwrap() == true {
+                if prompt_quit().prompt().unwrap() {
                     let file = File::create(format!("{:?}value_net.json", NODE_COUNT))?;
                     serde_json::to_writer(file, &chessnet)?;
                 }
@@ -141,7 +139,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
                 false => None,
             };
             let new_tx = tx.clone();
-            let new_epoch = scoreboard.epoch.clone();
+            let new_epoch = scoreboard.epoch;
             rayon::spawn(move || {
                 play(new_net, new_enm, new_tx, new_epoch, true);
                 INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
@@ -211,7 +209,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
                         false => None,
                     };
                     let new_tx = tx_r.clone();
-                    let new_epoch = r_scoreboard.epoch.clone();
+                    let new_epoch = r_scoreboard.epoch;
                     rayon::spawn(move || {
                         play(new_net, new_enm, new_tx, new_epoch, false);
                         INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);

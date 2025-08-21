@@ -76,7 +76,7 @@ fn play_game(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: bool) -> Ga
     }
 
     let GameState::Finished(result) = game_state else { unreachable!() };
-    return result;
+    result
 }
 
 #[rustfmt::skip]
@@ -113,7 +113,7 @@ fn learn_game(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: bool) -> (
     }
 
     let GameState::Finished(result) = game_state else { unreachable!() };
-    return (result, ins.into_iter().zip(outs).collect());
+    (result, ins.into_iter().zip(outs).collect())
 }
 
 //TODO remove this
