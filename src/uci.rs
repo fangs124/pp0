@@ -1,4 +1,7 @@
-use std::{io, time::Duration};
+use std::{
+    io::{self, Write},
+    time::Duration,
+};
 
 use chessbb::TranspositionTable;
 
@@ -15,10 +18,6 @@ impl ChessNet {
 
         loop {
             while let Ok(count) = io::BufRead::read_line(&mut reader, &mut buffer) {
-                //if DEBUG {
-                //    print!("buffer:{}", buffer);
-                //}
-
                 if count == 0 {
                     return Ok(());
                 }
@@ -26,11 +25,15 @@ impl ChessNet {
                 let mut cmds = buffer.split_whitespace();
                 if let Some(cmd) = cmds.next() {
                     match cmd {
-                        "isready" => println!("readyok"),
+                        "isready" => {
+                            println!("readyok");
+                            io::stdout().flush()?;
+                        }
                         "uci" => {
                             println!("id name pp0");
                             println!("id author Fangs");
                             println!("uciok");
+                            io::stdout().flush()?;
                         }
                         "position" => uci_position(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str()),
                         "ucinewgame" => {
@@ -48,7 +51,6 @@ impl ChessNet {
                         _ => {} //???
                     }
                 }
-                //buffer.clear();
             }
         }
     }
@@ -57,7 +59,7 @@ impl ChessNet {
 fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
     let mut cmds = cmd_str.split(' ');
     let mut is_parsing_moves = false;
-    println!("cmds: {:?}", cmds);
+    //println!("cmds: {:?}", cmds);
     while let Some(cmd) = cmds.next() {
         if !is_parsing_moves {
             match cmd {
@@ -70,9 +72,9 @@ fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
                         i += 1;
                     }
                     //let fen = cmds.take(6).fold(String::new(), |a, b| a + " " + b);
-                    println!("fen: {}", fen);
+                    //println!("fen: {}", fen);
                     *chessgame = ChessGame::from_fen(&fen);
-                    println!("cmds: {:?}", cmds.clone().collect::<Vec<&str>>());
+                    //println!("cmds: {:?}", cmds.clone().collect::<Vec<&str>>());
                     // rnb1kbnr/ppp1pppp/8/4q3/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 0 1
                 }
                 "MOVES" | "moves" => {
