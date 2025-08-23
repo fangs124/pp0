@@ -1,6 +1,8 @@
 use std::io;
 
-use crate::chessnet::{ChessGame, ChessNet};
+use chessbb::TranspositionTable;
+
+use crate::{ChessGame, ChessNet};
 
 //const DEBUG: bool = false;
 
@@ -9,6 +11,7 @@ impl ChessNet {
         let mut chessgame = ChessGame::start_pos();
         let mut reader = io::BufReader::new(io::stdin());
         let mut buffer = String::with_capacity(1 << 12);
+        let mut tt = TranspositionTable::new();
         while let Ok(count) = io::BufRead::read_line(&mut reader, &mut buffer) {
             //if DEBUG {
             //    print!("buffer:{}", buffer);
@@ -28,9 +31,12 @@ impl ChessNet {
                         println!("uciok");
                     }
                     "position" => uci_position(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str()),
-                    "ucinewgame" => _ = uci_go(&mut chessgame, "startpos", self),
+                    "ucinewgame" => _ = uci_go(&mut chessgame, "startpos", self, &mut tt),
                     "go" => {
-                        println!("{}", uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self))
+                        println!(
+                            "{}",
+                            uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self, &mut tt)
+                        )
                     }
                     "quit" => return Ok(()),
                     //TODO
@@ -77,7 +83,7 @@ fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
     }
 }
 
-pub fn uci_go(chessgame: &mut ChessGame, cmd_str: &str, net: &mut ChessNet) -> String {
+pub fn uci_go(chessgame: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt: &mut TranspositionTable) -> String {
     let mut depth: usize = 3;
 
     let mut cmds = cmd_str.split(' ');
@@ -95,5 +101,5 @@ pub fn uci_go(chessgame: &mut ChessGame, cmd_str: &str, net: &mut ChessNet) -> S
         //other cases?
     }
     //search_position(depth)
-    return format!("bestmove {}", net.negamax_cold(chessgame, depth).print_move());
+    return format!("bestmove {}", net.negamax_cold(chessgame, depth, tt).print_move());
 }

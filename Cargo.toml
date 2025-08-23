@@ -3,6 +3,13 @@ name = "pp0"
 version = "0.1.0"
 edition = "2024"
 
+[profile.dev]
+opt-level = 1
+debug = 1
+
+[profile.release]
+opt-level = 3
+
 [dependencies]
 #nnet = { git = "https://github.com/fangs124/nnet.git" }
 #chessbb = { git = "https://github.com/fangs124/chessbb.git" }
@@ -19,3 +26,4 @@ inquire = "0.7"
 termion = "4"
 rayon = "1"
 itertools = "0.14"
+#backtrace-on-stack-overflow = "0.3.0"
