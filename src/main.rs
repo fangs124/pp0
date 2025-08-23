@@ -47,9 +47,9 @@ enum State {
     Quit,
 }
 
-const IS_ALT: bool = false;
+const IS_ALT: bool = true;
 fn alt_main() -> std::io::Result<()> {
-    let file = File::open(format!("{:?}value_net.json", NODE_COUNT))?;
+    let file = File::open(format!("{:?}net.json", NODE_COUNT))?;
     let mut buf_reader = BufReader::new(file);
     let mut contents = String::new();
     buf_reader.read_to_string(&mut contents)?;
@@ -70,7 +70,7 @@ fn main() -> std::io::Result<()> {
     let mut chessnet: ChessNet = match prompt_load().prompt().unwrap() {
         true => ChessNet::new(NODE_COUNT.to_vec()),
         false => {
-            let file = File::open(format!("{:?}value_net.json", NODE_COUNT))?;
+            let file = File::open(format!("{:?}net.json", NODE_COUNT))?;
             let mut buf_reader = BufReader::new(file);
             let mut contents = String::new();
             buf_reader.read_to_string(&mut contents)?;
@@ -83,7 +83,7 @@ fn main() -> std::io::Result<()> {
         match state {
             State::Quit => {
                 if prompt_quit().prompt().unwrap() == true {
-                    let file = File::create(format!("{:?}value_net.json", NODE_COUNT))?;
+                    let file = File::create(format!("{:?}net.json", NODE_COUNT))?;
                     serde_json::to_writer(file, &chessnet)?;
                 }
                 is_quit = true;

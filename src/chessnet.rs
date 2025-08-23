@@ -64,7 +64,7 @@ impl ChessNet {
         cg.clone().cb.negamax(i16::MIN + 1, i16::MAX - 1, d, 0, self, tt).1.unwrap()
     }
 
-    pub fn iterative_deepening(
+    pub fn iterative_deepening_hot(
         &mut self,
         cg: &ChessGame,
         moves: Vec<ChessMove>,
@@ -79,6 +79,36 @@ impl ChessNet {
             best_move = self.negamax(cg, d, &moves, tt);
             d += 1;
         }
+        return best_move;
+    }
+
+    pub fn iterative_deepening(
+        &mut self,
+        cg: &ChessGame,
+        max_depth: Option<usize>,
+        tt: &mut TranspositionTable,
+        time_limit: Duration,
+    ) -> ChessMove {
+        let now = Instant::now();
+        let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
+        assert!(!moves.is_empty());
+        let mut best_move = moves[0].clone();
+        let mut d: usize = 1;
+        match max_depth {
+            None => {
+                while now.elapsed() < time_limit {
+                    best_move = self.negamax(cg, d, &moves, tt);
+                    d += 1;
+                }
+            }
+            Some(max_depth) => {
+                while now.elapsed() < time_limit && d <= max_depth {
+                    best_move = self.negamax(cg, d, &moves, tt);
+                    d += 1;
+                }
+            }
+        }
+
         return best_move;
     }
     pub fn negamax(
@@ -98,7 +128,7 @@ impl ChessNet {
             //let old_core: ChessBoardCore = chess_game.cb.core.clone();
             let snapshot = chess_game.cb.explore_state(*chess_move);
             //depth instead of depth-1 here so that call to ChessNet::negamax() has implicit depth >= 1.
-            let (value, _next_move) = negate(chess_game.cb.negamax(-beta, -alpha, d, 1, self, tt));
+            let (value, _next_move) = negate(chess_game.cb.negamax(-beta, -alpha, d - 1, 1, self, tt));
             chess_game.cb.restore_state(snapshot);
 
             if value > alpha {

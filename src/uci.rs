@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, time::Duration};
 
 use chessbb::TranspositionTable;
 
@@ -12,70 +12,81 @@ impl ChessNet {
         let mut reader = io::BufReader::new(io::stdin());
         let mut buffer = String::with_capacity(1 << 12);
         let mut tt = TranspositionTable::new();
-        while let Ok(count) = io::BufRead::read_line(&mut reader, &mut buffer) {
-            //if DEBUG {
-            //    print!("buffer:{}", buffer);
-            //}
 
-            if count == 0 {
-                return Ok(());
-            }
+        loop {
+            while let Ok(count) = io::BufRead::read_line(&mut reader, &mut buffer) {
+                //if DEBUG {
+                //    print!("buffer:{}", buffer);
+                //}
 
-            let mut cmds = buffer.split_whitespace();
-            if let Some(cmd) = cmds.next() {
-                match cmd {
-                    "isready" => println!("readyok"),
-                    "uci" => {
-                        println!("id name pp0");
-                        println!("id author Fangs");
-                        println!("uciok");
-                    }
-                    "position" => uci_position(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str()),
-                    "ucinewgame" => _ = uci_go(&mut chessgame, "startpos", self, &mut tt),
-                    "go" => {
-                        println!(
-                            "{}",
-                            uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self, &mut tt)
-                        )
-                    }
-                    "quit" => return Ok(()),
-                    //TODO
-                    _ => {} //???
+                if count == 0 {
+                    return Ok(());
                 }
-            }
-            buffer.clear();
-        }
 
-        return Ok(());
+                let mut cmds = buffer.split_whitespace();
+                if let Some(cmd) = cmds.next() {
+                    match cmd {
+                        "isready" => println!("readyok"),
+                        "uci" => {
+                            println!("id name pp0");
+                            println!("id author Fangs");
+                            println!("uciok");
+                        }
+                        "position" => uci_position(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str()),
+                        "ucinewgame" => {
+                            chessgame = ChessGame::start_pos();
+                            tt = TranspositionTable::new();
+                        }
+                        "go" => {
+                            println!(
+                                "{}",
+                                uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self, &mut tt)
+                            )
+                        }
+                        "quit" => return Ok(()),
+                        //TODO
+                        _ => {} //???
+                    }
+                }
+                //buffer.clear();
+            }
+        }
     }
 }
 
 fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
     let mut cmds = cmd_str.split(' ');
     let mut is_parsing_moves = false;
-    'commands: while let Some(cmd) = cmds.next() {
+    println!("cmds: {:?}", cmds);
+    while let Some(cmd) = cmds.next() {
         if !is_parsing_moves {
             match cmd {
                 "startpos" => *chessgame = ChessGame::start_pos(),
                 "FEN" | "fen" => {
-                    if let Some(fen) = cmds.next() {
-                        *chessgame = ChessGame::from_fen(fen);
-                    } else {
-                        *chessgame = ChessGame::start_pos();
+                    let mut i = 0;
+                    let mut fen: String = String::new();
+                    while i < 6 {
+                        fen = fen + cmds.next().unwrap() + " ";
+                        i += 1;
                     }
+                    //let fen = cmds.take(6).fold(String::new(), |a, b| a + " " + b);
+                    println!("fen: {}", fen);
+                    *chessgame = ChessGame::from_fen(&fen);
+                    println!("cmds: {:?}", cmds.clone().collect::<Vec<&str>>());
+                    // rnb1kbnr/ppp1pppp/8/4q3/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 0 1
                 }
                 "MOVES" | "moves" => {
                     is_parsing_moves = true;
                 }
                 //TODO
-                _ => panic!("unknown command"),
+                _ => (),
             }
         } else {
             for chess_move in chessgame.try_generate_moves().0 {
                 if chess_move.print_move() == cmd {
                     //todo: maybe parse into a source/target and do int compare
                     chessgame.update_state(chess_move);
-                    continue 'commands;
+                    return;
                 }
             }
             panic!("invalid move")
@@ -83,23 +94,28 @@ fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
     }
 }
 
-pub fn uci_go(chessgame: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt: &mut TranspositionTable) -> String {
-    let mut depth: usize = 3;
-
+pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt: &mut TranspositionTable) -> String {
     let mut cmds = cmd_str.split(' ');
-
+    let mut wtime: Duration = Duration::from_secs(1);
+    let mut btime: Duration = Duration::from_secs(1);
+    let mut winc: Duration = Duration::from_secs(0);
+    let mut binc: Duration = Duration::from_secs(0);
+    let mut depth: Option<usize> = None;
     while let Some(cmd) = cmds.next() {
-        // fix depth search
-        if cmd == "depth" {
-            //todo: fix this lazy shit
-            depth = cmds.next().expect("Invalid input").parse::<usize>().expect("Invalid input");
+        match cmd {
+            "depth" => depth = Some(cmds.next().unwrap().parse::<usize>().unwrap()),
+            "wtime" => wtime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap()),
+            "btime" => btime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap()),
+            "winc" => winc = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap()),
+            "binc" => binc = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap()),
+            _ => (),
         }
-        // other cases placeholder
-        else {
-            depth = 3;
-        }
-        //other cases?
     }
+    let time_left: Duration = match chess_game.side() {
+        chessbb::Side::White => wtime / 20 + winc / 2,
+        chessbb::Side::Black => btime / 20 + binc / 2,
+    };
+
     //search_position(depth)
-    return format!("bestmove {}", net.negamax_cold(chessgame, depth, tt).print_move());
+    return format!("bestmove {}", net.iterative_deepening(chess_game, depth, tt, time_left).print_move());
 }
