@@ -6,7 +6,6 @@ use std::time::Duration;
 
 use chessbb::{ChessMove, GameResult, Side};
 use inquire::Select;
-use nnet::InputType;
 use termion::raw::IntoRawMode;
 use termion::{async_stdin, clear, cursor};
 
@@ -30,7 +29,7 @@ const NODE_COUNT: [usize; 3] = [128, 64, 1];
 const MAX_INSTANCE: usize = 24;
 const BATCH_SIZE: usize = 1000;
 const REVIEW_SIZE: usize = 1000;
-const UPDATE_PER_BATCH: usize = 1;
+const UPDATE_PER_BATCH: usize = 10;
 
 const LEARNING_RATE: f32 = 0.01;
 const FALLBACK_DEPTH: usize = 3;
@@ -47,7 +46,7 @@ enum State {
     Quit,
 }
 
-const IS_ALT: bool = true;
+const IS_ALT: bool = false;
 fn alt_main() -> std::io::Result<()> {
     let file = File::open(format!("{:?}net.json", NODE_COUNT))?;
     let mut buf_reader = BufReader::new(file);

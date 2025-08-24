@@ -1,4 +1,10 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        mpsc,
+    },
+    time::{Duration, Instant},
+};
 
 use chessbb::{
     ChessBoard, ChessBoardCore, ChessMove, ChessPiece, Evaluator, GameResult, GameState, MATERIAL_EVAL, PieceType,
@@ -11,6 +17,9 @@ use serde::{Deserialize, Serialize};
 use crate::{ChessGame, LEARNING_RATE, nnet::*, simulation::TrainingResult};
 
 const TABLE_SIZE: usize = 1 << 22;
+
+const MAX_SEARCH_INSTANCE: usize = 1;
+static SEARCH_INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0_usize);
 
 //alpha-beta nets
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -94,18 +103,29 @@ impl ChessNet {
         assert!(!moves.is_empty());
         let mut best_move = moves[0].clone();
         let mut d: usize = 1;
-        match max_depth {
-            None => {
-                while now.elapsed() < time_limit {
-                    best_move = self.negamax(cg, d, &moves, tt);
-                    d += 1;
-                }
+        let (tx, rx) = mpsc::channel::<ChessMove>();
+        let max_depth = match max_depth {
+            Some(x) => x,
+            None => usize::MAX,
+        };
+
+        while now.elapsed() < time_limit && d <= max_depth {
+            if SEARCH_INSTANCE_COUNT.load(Ordering::SeqCst) <= MAX_SEARCH_INSTANCE {
+                SEARCH_INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
+                let mut net = self.clone();
+                let tx_new = tx.clone();
+                let cg_new = cg.clone();
+                let mut tt_new = tt.clone();
+                let moves_new = moves.clone();
+                rayon::spawn(move || {
+                    _ = tx_new.send(net.negamax(&cg_new, d, &moves_new, &mut tt_new));
+                    SEARCH_INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
+                });
             }
-            Some(max_depth) => {
-                while now.elapsed() < time_limit && d <= max_depth {
-                    best_move = self.negamax(cg, d, &moves, tt);
-                    d += 1;
-                }
+
+            while let Ok(data) = rx.try_recv() {
+                best_move = data;
+                d += 1;
             }
         }
 
@@ -205,7 +225,7 @@ impl ChessNet {
         let reward: f32 = match (data.net_side, data.result) {
             (Side::White, GameResult::WhiteWins) | (Side::Black, GameResult::BlackWins) => 1.0,
             (Side::White, GameResult::BlackWins) | (Side::Black, GameResult::WhiteWins) => -1.0,
-            (_, GameResult::Draw) => 0.1,
+            (_, GameResult::Draw) => -0.01,
         };
 
         let mut ith_move: usize = match data.net_side {

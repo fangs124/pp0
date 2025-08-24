@@ -16,43 +16,42 @@ impl ChessNet {
         let mut buffer = String::with_capacity(1 << 12);
         let mut tt = TranspositionTable::new();
 
-        loop {
-            while let Ok(count) = io::BufRead::read_line(&mut reader, &mut buffer) {
-                if count == 0 {
-                    return Ok(());
-                }
+        while let Ok(count) = io::BufRead::read_line(&mut reader, &mut buffer) {
+            if count == 0 {
+                return Ok(());
+            }
 
-                let mut cmds = buffer.split_whitespace();
-                if let Some(cmd) = cmds.next() {
-                    match cmd {
-                        "isready" => {
-                            println!("readyok");
-                            io::stdout().flush()?;
-                        }
-                        "uci" => {
-                            println!("id name pp0");
-                            println!("id author Fangs");
-                            println!("uciok");
-                            io::stdout().flush()?;
-                        }
-                        "position" => uci_position(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str()),
-                        "ucinewgame" => {
-                            chessgame = ChessGame::start_pos();
-                            tt = TranspositionTable::new();
-                        }
-                        "go" => {
-                            println!(
-                                "{}",
-                                uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self, &mut tt)
-                            )
-                        }
-                        "quit" => return Ok(()),
-                        //TODO
-                        _ => {} //???
+            let mut cmds = buffer.split_whitespace();
+            if let Some(cmd) = cmds.next() {
+                match cmd {
+                    "isready" => {
+                        println!("readyok");
                     }
+                    "uci" => {
+                        println!("id name pp0");
+                        println!("id author Fangs");
+                        println!("uciok");
+                    }
+                    "position" => uci_position(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str()),
+                    "ucinewgame" => {
+                        chessgame = ChessGame::start_pos();
+                        tt = TranspositionTable::new();
+                    }
+                    "go" => {
+                        println!(
+                            "{}",
+                            uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self, &mut tt)
+                        )
+                    }
+                    "quit" => return Ok(()),
+                    //TODO
+                    _ => {} //???
                 }
             }
+            buffer.clear();
         }
+        //loop {}
+        Ok(())
     }
 }
 
@@ -60,7 +59,7 @@ fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
     let mut cmds = cmd_str.split(' ');
     let mut is_parsing_moves = false;
     //println!("cmds: {:?}", cmds);
-    while let Some(cmd) = cmds.next() {
+    'a: while let Some(cmd) = cmds.next() {
         if !is_parsing_moves {
             match cmd {
                 "startpos" => *chessgame = ChessGame::start_pos(),
@@ -74,6 +73,7 @@ fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
                     //let fen = cmds.take(6).fold(String::new(), |a, b| a + " " + b);
                     //println!("fen: {}", fen);
                     *chessgame = ChessGame::from_fen(&fen);
+                    eprintln!("board:\n\r{}", chessgame.cb);
                     //println!("cmds: {:?}", cmds.clone().collect::<Vec<&str>>());
                     // rnb1kbnr/ppp1pppp/8/4q3/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 0 1
                 }
@@ -88,7 +88,8 @@ fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
                 if chess_move.print_move() == cmd {
                     //todo: maybe parse into a source/target and do int compare
                     chessgame.update_state(chess_move);
-                    return;
+                    eprintln!("board:\n\r{}", chessgame.cb);
+                    continue 'a;
                 }
             }
             panic!("invalid move")
@@ -114,10 +115,19 @@ pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt:
         }
     }
     let time_left: Duration = match chess_game.side() {
-        chessbb::Side::White => wtime / 20 + winc / 2,
-        chessbb::Side::Black => btime / 20 + binc / 2,
+        chessbb::Side::White => (wtime / BASE_COEFF) + (winc / INCREMENT_COEFF),
+        chessbb::Side::Black => (btime / BASE_COEFF) + (binc / INCREMENT_COEFF),
     };
-
+    //eprintln!(
+    //    "wtime: {}ms, winc: {}ms, btime: {}ms, binc:{}ms",
+    //    wtime.as_millis(),
+    //    winc.as_millis(),
+    //    btime.as_millis(),
+    //    binc.as_millis()
+    //);
     //search_position(depth)
     return format!("bestmove {}", net.iterative_deepening(chess_game, depth, tt, time_left).print_move());
 }
+
+const BASE_COEFF: u32 = 20;
+const INCREMENT_COEFF: u32 = 2;
