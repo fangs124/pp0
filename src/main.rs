@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use chessbb::{ChessMove, GameResult, Side};
 use inquire::Select;
+use rand::random_range;
 use termion::raw::IntoRawMode;
 use termion::{async_stdin, clear, cursor};
 
@@ -27,9 +28,9 @@ type GR = GameResult;
 
 const NODE_COUNT: [usize; 3] = [128, 64, 1];
 const MAX_INSTANCE: usize = 24;
-const BATCH_SIZE: usize = 1000;
+const BATCH_SIZE: usize = 10000;
 const REVIEW_SIZE: usize = 1000;
-const UPDATE_PER_BATCH: usize = 10;
+const UPDATE_PER_BATCH: usize = 1;
 
 const LEARNING_RATE: f32 = 0.01;
 const FALLBACK_DEPTH: usize = 3;
@@ -310,6 +311,11 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
     let f = File::create(format!("{:?}.log", NODE_COUNT)).unwrap();
     let mut f_buff: BufWriter<&File> = BufWriter::new(&f);
 
+    let mut f_uho_lichess = File::open("UHO_Lichess_4852_v1.epd")?;
+    let mut s_uho_lichess = String::new();
+    f_uho_lichess.read_to_string(&mut s_uho_lichess)?;
+    let uho_lichess: Vec<String> = s_uho_lichess.split('\n').map(|s| s.to_string()).collect();
+    let uho_lichess_len = uho_lichess.len();
     let mut stream_out = BufWriter::new(std::io::stdout());
     //let mut stdout = std::io::stdout();
     let mut stdout: termion::raw::RawTerminal<std::io::StdoutLock<'static>> =
@@ -354,8 +360,9 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             };
             let new_tx = tx.clone();
             let new_epoch = scoreboard.epoch.clone();
+            let fen = uho_lichess[random_range(0..uho_lichess_len)].clone();
             rayon::spawn(move || {
-                play(new_net, new_enm, new_tx, new_epoch, true);
+                play(new_net, new_enm, Some(&fen), new_tx, new_epoch, true);
                 INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                 RETURN_COUNT.fetch_add(1_usize, Ordering::SeqCst);
             });
@@ -424,8 +431,9 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
                     };
                     let new_tx = tx_r.clone();
                     let new_epoch = r_scoreboard.epoch.clone();
+                    let fen = uho_lichess[random_range(0..uho_lichess_len)].clone();
                     rayon::spawn(move || {
-                        play(new_net, new_enm, new_tx, new_epoch, false);
+                        play(new_net, new_enm, Some(&fen), new_tx, new_epoch, false);
                         INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                     });
                 }

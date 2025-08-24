@@ -1,7 +1,4 @@
-use std::{
-    io::{self, Write},
-    time::Duration,
-};
+use std::{io, time::Duration};
 
 use chessbb::TranspositionTable;
 

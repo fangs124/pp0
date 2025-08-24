@@ -6,10 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use chessbb::{
-    ChessBoard, ChessBoardCore, ChessMove, ChessPiece, Evaluator, GameResult, GameState, MATERIAL_EVAL, PieceType,
-    Side, Square, TranspositionTable,
-};
+use chessbb::{ChessBoard, ChessMove, Evaluator, GameResult, Side, TranspositionTable};
 use nalgebra::DVector;
 use rand::{random_bool, random_range};
 use serde::{Deserialize, Serialize};
