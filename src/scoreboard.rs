@@ -38,6 +38,10 @@ impl ScoreBoard {
         }
     }
 
+    pub fn now(&mut self) {
+        self.now = Instant::now();
+    }
+
     pub fn update(&mut self) {
         let total = self.wins + self.draws + self.losses;
         self.prev_w = 100.0 * (self.wins as f32) / (total as f32);

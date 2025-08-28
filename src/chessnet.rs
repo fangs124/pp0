@@ -1,5 +1,6 @@
 use std::{
     sync::{
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
         mpsc,
     },
@@ -72,7 +73,7 @@ impl ChessNet {
 
     pub fn iterative_deepening_hot(
         &mut self,
-        cg: &ChessGame,
+        cg: &mut ChessGame,
         moves: Vec<ChessMove>,
         tt: &mut TranspositionTable,
         time_limit: Duration,
@@ -90,7 +91,7 @@ impl ChessNet {
 
     pub fn iterative_deepening(
         &mut self,
-        cg: &ChessGame,
+        cg: &mut ChessGame,
         max_depth: Option<usize>,
         tt: &mut TranspositionTable,
         time_limit: Duration,
@@ -99,23 +100,22 @@ impl ChessNet {
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
         assert!(!moves.is_empty());
         let mut best_move = moves[0].clone();
-        let mut d: usize = 1;
         let (tx, rx) = mpsc::channel::<ChessMove>();
         let max_depth = match max_depth {
             Some(x) => x,
             None => usize::MAX,
         };
-
+        let mut d = 1;
         while now.elapsed() < time_limit && d <= max_depth {
             if SEARCH_INSTANCE_COUNT.load(Ordering::SeqCst) <= MAX_SEARCH_INSTANCE {
                 SEARCH_INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
                 let mut net = self.clone();
                 let tx_new = tx.clone();
-                let cg_new = cg.clone();
+                let mut cg_new = cg.clone();
                 let mut tt_new = tt.clone();
                 let moves_new = moves.clone();
                 rayon::spawn(move || {
-                    _ = tx_new.send(net.negamax(&cg_new, d, &moves_new, &mut tt_new));
+                    _ = tx_new.send(net.negamax(&mut cg_new, d, &moves_new, &mut tt_new));
                     SEARCH_INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                 });
             }
@@ -128,9 +128,64 @@ impl ChessNet {
 
         return best_move;
     }
+
+    pub fn _iterative_deepening(
+        &mut self,
+        cg: &mut ChessGame,
+        max_depth: Option<usize>,
+        tt: Arc<Mutex<TranspositionTable>>,
+        time_limit: Duration,
+    ) -> ChessMove {
+        let now = Instant::now();
+        let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
+        assert!(!moves.is_empty());
+        let mut best_move = moves[0].clone();
+        let (tx, rx) = mpsc::channel::<ChessMove>();
+        let max_depth = match max_depth {
+            Some(x) => x,
+            None => usize::MAX,
+        };
+        let tt_new = tt.clone();
+        let cg = cg.clone();
+        let mut net = self.clone();
+        rayon::spawn(move || {
+            let mut d: usize = 1;
+            let mut cg = cg;
+            let mut tt = tt_new.lock().unwrap();
+            let moves = moves;
+            while d < max_depth {
+                match tx.send(net.negamax(&mut cg, d, &moves, &mut tt)) {
+                    Ok(_) => (),
+                    Err(_) => break,
+                }
+                d += 1;
+            }
+        });
+
+        while now.elapsed() < time_limit {
+            //if SEARCH_INSTANCE_COUNT.load(Ordering::SeqCst) <= MAX_SEARCH_INSTANCE {
+            //    SEARCH_INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
+            //    let mut net = self.clone();
+            //    let tx_new = tx.clone();
+            //    let mut cg_new = cg.clone();
+            //    let mut tt_new = tt.clone();
+            //    let moves_new = moves.clone();
+            //    rayon::spawn(move || {
+            //        _ = tx_new.send(net.negamax(&mut cg_new, d, &moves_new, &mut tt_new));
+            //        SEARCH_INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
+            //    });
+            //}
+
+            while let Ok(data) = rx.try_recv() {
+                best_move = data;
+            }
+        }
+
+        return best_move;
+    }
     pub fn negamax(
         &mut self,
-        cg: &ChessGame,
+        cg: &mut ChessGame,
         d: usize,
         moves: &Vec<ChessMove>,
         tt: &mut TranspositionTable,
@@ -139,14 +194,13 @@ impl ChessNet {
         let mut alpha: i16 = i16::MIN + 1;
         let beta: i16 = i16::MAX - 1;
         let mut best_move: ChessMove = moves[0].clone();
-        let mut chess_game: ChessGame = cg.clone();
 
         for chess_move in moves {
             //let old_core: ChessBoardCore = chess_game.cb.core.clone();
-            let snapshot = chess_game.cb.explore_state(*chess_move);
+            let snapshot = cg.cb.explore_state(*chess_move);
             //depth instead of depth-1 here so that call to ChessNet::negamax() has implicit depth >= 1.
-            let (value, _next_move) = negate(chess_game.cb.negamax(-beta, -alpha, d - 1, 1, self, tt));
-            chess_game.cb.restore_state(snapshot);
+            let (value, _next_move) = negate(cg.cb.negamax(-beta, -alpha, d - 1, 1, self, tt));
+            cg.cb.restore_state(snapshot);
 
             if value > alpha {
                 alpha = value;
@@ -177,7 +231,7 @@ impl ChessNet {
 
     pub fn negamax_learn(
         &mut self,
-        cg: &ChessGame,
+        cg: &mut ChessGame,
         d: usize,
         ins: &mut Vec<DVf32>,
         outs: &mut Vec<DVf32>,
@@ -191,7 +245,7 @@ impl ChessNet {
 
     pub fn negamax_epsilon(
         &mut self,
-        cg: &ChessGame,
+        cg: &mut ChessGame,
         d: usize,
         moves: &Vec<ChessMove>,
         tt: &mut TranspositionTable,
@@ -205,7 +259,7 @@ impl ChessNet {
 
     pub fn negamax_learn_epsilon(
         &mut self,
-        cg: &ChessGame,
+        cg: &mut ChessGame,
         d: usize,
         ins: &mut Vec<DVf32>,
         outs: &mut Vec<DVf32>,
@@ -222,7 +276,7 @@ impl ChessNet {
         let reward: f32 = match (data.net_side, data.result) {
             (Side::White, GameResult::WhiteWins) | (Side::Black, GameResult::BlackWins) => 1.0,
             (Side::White, GameResult::BlackWins) | (Side::Black, GameResult::WhiteWins) => -1.0,
-            (_, GameResult::Draw) => -0.01,
+            (_, GameResult::Draw) => -0.05,
         };
 
         let mut ith_move: usize = match data.net_side {
@@ -278,7 +332,7 @@ impl ChessNet {
 
 #[inline(always)]
 fn compute_scalar(index: usize, total: usize) -> f32 {
-    0.5 + (0.5 * (((index) as f32) / (total as f32)))
+    0.8 + (0.2 * (((index) as f32) / (total as f32)))
 }
 
 #[inline(always)]

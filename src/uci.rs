@@ -1,17 +1,22 @@
-use std::{io, time::Duration};
+use std::{
+    io,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use chessbb::TranspositionTable;
 
 use crate::{ChessGame, ChessNet};
 
 //const DEBUG: bool = false;
-
+//const foo: usize = size_of::<TranspositionTable>(); //16 bytes
+//const bar: usize = size_of::<Mutex<TranspositionTable>>(); //24 bytes
 impl ChessNet {
     pub fn uci_loop_start(&mut self) -> io::Result<()> {
         let mut chessgame = ChessGame::start_pos();
         let mut reader = io::BufReader::new(io::stdin());
         let mut buffer = String::with_capacity(1 << 12);
-        let mut tt = TranspositionTable::new();
+        let mut tt: TranspositionTable = TranspositionTable::new();
 
         while let Ok(count) = io::BufRead::read_line(&mut reader, &mut buffer) {
             if count == 0 {
@@ -52,14 +57,14 @@ impl ChessNet {
     }
 }
 
-fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
+fn uci_position(chess_game: &mut ChessGame, cmd_str: &str) {
     let mut cmds = cmd_str.split(' ');
     let mut is_parsing_moves = false;
     //println!("cmds: {:?}", cmds);
     'a: while let Some(cmd) = cmds.next() {
         if !is_parsing_moves {
             match cmd {
-                "startpos" => *chessgame = ChessGame::start_pos(),
+                "startpos" => *chess_game = ChessGame::start_pos(),
                 "FEN" | "fen" => {
                     let mut i = 0;
                     let mut fen: String = String::new();
@@ -69,8 +74,8 @@ fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
                     }
                     //let fen = cmds.take(6).fold(String::new(), |a, b| a + " " + b);
                     //println!("fen: {}", fen);
-                    *chessgame = ChessGame::from_fen(&fen);
-                    eprintln!("board:\n\r{}", chessgame.cb);
+                    *chess_game = ChessGame::from_fen(&fen);
+                    //eprintln!("board:\n\r{}", chess_game.cb);
                     //println!("cmds: {:?}", cmds.clone().collect::<Vec<&str>>());
                     // rnb1kbnr/ppp1pppp/8/4q3/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 0 1
                 }
@@ -81,15 +86,18 @@ fn uci_position(chessgame: &mut ChessGame, cmd_str: &str) {
                 _ => (),
             }
         } else {
-            for chess_move in chessgame.try_generate_moves().0 {
+            //example:
+            //position fen r1b1kbnr/ppp2ppp/3p1q2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 0 1 moves e1g1 f6f2 d4f2 g8h6 f2e1
+            //eprintln!("cmd: {:?}", cmd);
+            //chess_game.make_move(cmd);
+            for chess_move in chess_game.try_generate_moves().0 {
                 if chess_move.print_move() == cmd {
                     //todo: maybe parse into a source/target and do int compare
-                    chessgame.update_state(chess_move);
-                    eprintln!("board:\n\r{}", chessgame.cb);
+                    chess_game.update_state(chess_move);
+                    eprintln!("board:\n\r{}", chess_game.cb);
                     continue 'a;
                 }
             }
-            panic!("invalid move")
         }
     }
 }

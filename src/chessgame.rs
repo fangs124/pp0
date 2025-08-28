@@ -3,12 +3,14 @@ use chessbb::{
 };
 use nalgebra::DVector;
 use nnet::InputType;
-use rand::random_range;
+use rand::{random_bool, random_range};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChessGame {
     pub(crate) cb: ChessBoard,
 }
+
+const EPSILON: f64 = 0.2;
 
 impl InputType for ChessGame {
     fn to_vector(&self) -> DVector<f32> {
@@ -28,6 +30,16 @@ impl ChessGame {
     }
 
     #[inline(always)]
+    pub fn parse_move(&self, move_str: &str) -> ChessMove {
+        return self.cb.parse_move(move_str);
+    }
+
+    #[inline(always)]
+    pub fn make_move(&mut self, move_str: &str) {
+        self.update_state(self.cb.parse_move(move_str));
+    }
+
+    #[inline(always)]
     pub fn try_generate_moves(&self) -> (Vec<ChessMove>, GameState) {
         return self.cb.try_generate_moves();
     }
@@ -42,32 +54,37 @@ impl ChessGame {
         self.cb.update_state(chess_move);
     }
 
+    pub fn find_move_hce_epsilon(
+        &mut self,
+        d: usize,
+        moves: &Vec<ChessMove>,
+        tt: &mut TranspositionTable,
+    ) -> ChessMove {
+        assert!(!moves.is_empty());
+        if random_bool(EPSILON) {
+            return moves[random_range(0..moves.len())];
+        }
+        return self.find_move_hce(d, moves, tt);
+    }
     //#[rustfmt::skip]
     #[inline(always)]
-    pub fn find_move_sanity_test(&mut self, d: usize, moves: Vec<ChessMove>, tt: &mut TranspositionTable) -> ChessMove {
+    pub fn find_move_hce(&mut self, d: usize, moves: &Vec<ChessMove>, tt: &mut TranspositionTable) -> ChessMove {
         assert!(!moves.is_empty() && d > 0);
         let mut alpha: i16 = i16::MIN + 1;
         let b: i16 = i16::MAX - 1;
         let mut best_move: ChessMove = moves[0].clone();
-        let mut action_values: Vec<(ChessMove, i16)> = moves.iter().map(|&x| (x, i16::MIN + 1)).collect();
-        for depth in d..=d {
-            for (chess_move, old_value) in action_values.iter_mut() {
-                let snapshot = self.cb.explore_state(*chess_move);
-                //NOTE: depth instead of depth-1 here so that call to ChessNet::negamax() has implicit depth >= 1.
-                let (value, _next_move) = negate(self.cb.negamax(-b, -alpha, depth - 1, 1, &mut MATERIAL_EVAL, tt));
-                self.cb.restore_state(snapshot);
 
-                if value > alpha {
-                    alpha = value;
-                    best_move = *chess_move;
-                }
+        for chess_move in moves {
+            let snapshot = self.cb.explore_state(*chess_move);
+            //NOTE: depth instead of depth-1 here so that call to ChessNet::negamax() has implicit depth >= 1.
+            let (value, _next_move) = negate(self.cb.negamax(-b, -alpha, d - 1, 1, &mut MATERIAL_EVAL, tt));
+            self.cb.restore_state(snapshot);
 
-                *old_value = value;
+            if value > alpha {
+                alpha = value;
+                best_move = *chess_move;
             }
-
-            //action_values.sort_by(|(_, av), (_, bv)| av.cmp(bv));
         }
-
         return best_move;
     }
 

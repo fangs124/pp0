@@ -14,6 +14,14 @@ pub struct TrainingResult {
 
 type TR = TrainingResult;
 
+pub struct PlayParameter {
+    epoch: usize,
+    is_learn: bool,
+    is_history: bool,
+    enm: Option<ChessNet>,
+    fen: Option<String>,
+}
+
 pub fn play(net: ChessNet, enm: Option<ChessNet>, fen: Option<&str>, tx: Sender<TR>, epoch: usize, is_learn: bool) {
     let is_net_white = rand::random_bool(0.5);
     let result: GameResult;
@@ -59,8 +67,8 @@ fn play_game(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: bool, fen: 
             let mut enm = enm.unwrap();
             while game_state == GameState::Ongoing {
                 let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-                    true => net.negamax(&chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
-                    false => enm.negamax(&chess_game, FALLBACK_DEPTH, &moves, &mut tt_enm),
+                    true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
+                    false => enm.negamax(&mut chess_game, FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
                 };
 
                 chess_game.update_state(chess_move);
@@ -70,8 +78,8 @@ fn play_game(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: bool, fen: 
         false => {
             while game_state == GameState::Ongoing {
                 let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-                    true => net.negamax(&chess_game, FALLBACK_DEPTH, &moves, &mut tt_enm),
-                    false => chess_game.random_move(),
+                    true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
+                    false => chess_game.find_move_hce(FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
                 };
 
                 chess_game.update_state(chess_move);
@@ -105,10 +113,15 @@ fn learn_game(
             let mut enm = enm.unwrap();
             while game_state == GameState::Ongoing {
                 let chessmove: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-                    true => {
-                        net.negamax_learn_epsilon(&chess_game, FALLBACK_DEPTH, &mut ins, &mut outs, &moves, &mut tt_net)
-                    }
-                    false => enm.negamax_epsilon(&chess_game, FALLBACK_DEPTH, &moves, &mut tt_enm),
+                    true => net.negamax_learn_epsilon(
+                        &mut chess_game,
+                        FALLBACK_DEPTH,
+                        &mut ins,
+                        &mut outs,
+                        &moves,
+                        &mut tt_net,
+                    ),
+                    false => enm.negamax_epsilon(&mut chess_game, FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
                 };
 
                 chess_game.update_state(chessmove);
@@ -118,8 +131,15 @@ fn learn_game(
         false => {
             while game_state == GameState::Ongoing {
                 let chessmove: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-                    true => net.negamax_learn(&chess_game, FALLBACK_DEPTH, &mut ins, &mut outs, &moves, &mut tt_net),
-                    false => chess_game.random_move(),
+                    true => net.negamax_learn_epsilon(
+                        &mut chess_game,
+                        FALLBACK_DEPTH,
+                        &mut ins,
+                        &mut outs,
+                        &moves,
+                        &mut tt_net,
+                    ),
+                    false => chess_game.find_move_hce_epsilon(FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
                 };
 
                 chess_game.update_state(chessmove);
@@ -140,13 +160,12 @@ fn play_game_history(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: boo
     let mut tt_enm = TranspositionTable::new();
 
     // play game
-    match enm.is_some() {
-        true => {
-            let mut enm = enm.unwrap();
+    match enm {
+        Some(mut enm) => {
             while game_state == GameState::Ongoing {
                 let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-                    true => net.negamax(&chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
-                    false => enm.negamax(&chess_game, FALLBACK_DEPTH, &moves, &mut tt_enm),
+                    true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
+                    false => enm.negamax(&mut chess_game, FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
                 };
 
                 history.push(chess_move);
@@ -154,11 +173,11 @@ fn play_game_history(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: boo
                 (moves, game_state) = chess_game.try_generate_moves();
             }
         }
-        false => {
+        None => {
             while game_state == GameState::Ongoing {
                 let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-                    true => net.negamax(&chess_game, FALLBACK_DEPTH, &moves, &mut tt_enm),
-                    false => chess_game.random_move(),
+                    true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
+                    false => chess_game.find_move_hce(FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
                 };
 
                 history.push(chess_move);
@@ -193,7 +212,7 @@ pub fn sanity_test(net: &mut ChessNet, tx: Sender<TrainingResultSanityTest>, epo
     // play game
     while game_state == GameState::Ongoing {
         let chessmove = match is_net_white == (chess_game.side() == Side::White) {
-            true => chess_game.find_move_sanity_test(FALLBACK_DEPTH, moves, &mut tt),
+            true => chess_game.find_move_hce(FALLBACK_DEPTH, &moves, &mut tt),
             false => chess_game.random_move(),
         };
 

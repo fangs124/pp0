@@ -26,11 +26,11 @@ mod uci;
 
 type GR = GameResult;
 
-const NODE_COUNT: [usize; 3] = [128, 64, 1];
+const NODE_COUNT: [usize; 3] = [512, 256, 1];
 const MAX_INSTANCE: usize = 24;
-const BATCH_SIZE: usize = 10000;
+const BATCH_SIZE: usize = 5000;
 const REVIEW_SIZE: usize = 1000;
-const UPDATE_PER_BATCH: usize = 1;
+const UPDATE_PER_BATCH: usize = 10;
 
 const LEARNING_RATE: f32 = 0.01;
 const FALLBACK_DEPTH: usize = 3;
@@ -109,8 +109,7 @@ fn train_sanity_test(net: &mut ChessNet) -> std::io::Result<()> {
 
     let mut stream_out = BufWriter::new(std::io::stdout());
     //let mut stdout = std::io::stdout();
-    let mut stdout: termion::raw::RawTerminal<std::io::StdoutLock<'static>> =
-        std::io::stdout().lock().into_raw_mode().unwrap();
+    let mut stdout = std::io::stdout().lock();
     let mut stdin = async_stdin().bytes();
 
     let mut enm: ChessNet = net.clone();
@@ -130,7 +129,7 @@ fn train_sanity_test(net: &mut ChessNet) -> std::io::Result<()> {
     let mut batch_count: usize = 0;
     let mut best_lose_rate: f32 = 100.0;
 
-    let mut is_stronger_than_rand = false;
+    let mut is_stronger_than_hce = false;
     let mut best_win_rate: f32 = 0.0;
 
     loop {
@@ -192,7 +191,7 @@ fn train_sanity_test(net: &mut ChessNet) -> std::io::Result<()> {
             write!(stdout, "{}{}{}{}", cursor::Goto(1, 6), clear::CurrentLine, cursor::Goto(1, 7), clear::CurrentLine)?;
             write!(stdout, "{}======== training result! ========\n\r", cursor::Goto(1, 2))?;
             write!(stdout, "discarded {}, threads finished: {}", discarded_count, RETURN_COUNT.load(Ordering::SeqCst))?;
-            write!(stdout, ", stronger than rand: {}\n\r", is_stronger_than_rand)?;
+            write!(stdout, ", stronger than rand: {}\n\r", is_stronger_than_hce)?;
             scoreboard.write(&mut stdout)?;
             scoreboard.write_to_buf(&mut f_buff)?;
             stream_out.flush()?;
@@ -261,8 +260,8 @@ fn train_sanity_test(net: &mut ChessNet) -> std::io::Result<()> {
                 enm = net.clone();
             }
 
-            if !is_stronger_than_rand && best_win_rate > 0.50 {
-                is_stronger_than_rand = true;
+            if !is_stronger_than_hce && best_win_rate > 0.50 {
+                is_stronger_than_hce = true;
                 best_lose_rate = 100.0;
                 best_win_rate = 0.0;
             }
@@ -339,7 +338,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
     let mut batch_count: usize = 0;
     let mut best_lose_rate: f32 = 100.0;
 
-    let mut is_stronger_than_rand = false;
+    let mut is_stronger_than_hce = true;
     let mut best_win_rate: f32 = 0.0;
 
     loop {
@@ -354,7 +353,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
         if INSTANCE_COUNT.load(Ordering::SeqCst) <= MAX_INSTANCE {
             INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
             let new_net: ChessNet = net.clone();
-            let new_enm: Option<ChessNet> = match is_stronger_than_rand {
+            let new_enm: Option<ChessNet> = match is_stronger_than_hce {
                 true => Some(enm.clone()),
                 false => None,
             };
@@ -362,6 +361,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             let new_epoch = scoreboard.epoch.clone();
             let fen = uho_lichess[random_range(0..uho_lichess_len)].clone();
             rayon::spawn(move || {
+                //play(new_net, new_enm, None, new_tx, new_epoch, true);
                 play(new_net, new_enm, Some(&fen), new_tx, new_epoch, true);
                 INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                 RETURN_COUNT.fetch_add(1_usize, Ordering::SeqCst);
@@ -409,7 +409,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             write!(stdout, "{}{}{}{}", cursor::Goto(1, 6), clear::CurrentLine, cursor::Goto(1, 7), clear::CurrentLine)?;
             write!(stdout, "{}======== training result! ========\n\r", cursor::Goto(1, 2))?;
             write!(stdout, "discarded {}, threads finished: {}", discarded_count, RETURN_COUNT.load(Ordering::SeqCst))?;
-            write!(stdout, ", stronger than rand: {}\n\r", is_stronger_than_rand)?;
+            write!(stdout, ", stronger than rand: {}\n\r", is_stronger_than_hce)?;
             scoreboard.write(&mut stdout)?;
             scoreboard.write_to_buf(&mut f_buff)?;
             stream_out.flush()?;
@@ -418,6 +418,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             //review if net is stronger
             let (tx_r, rx_r) = mpsc::channel::<TrainingResult>();
             let mut review_match_count: usize = 0;
+            r_scoreboard.now();
             r_scoreboard.epoch = scoreboard.epoch;
             while review_match_count < REVIEW_SIZE {
                 //launch a game if there are idle threads
@@ -425,7 +426,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
                     INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
 
                     let new_net: ChessNet = net.clone();
-                    let new_enm: Option<ChessNet> = match is_stronger_than_rand {
+                    let new_enm: Option<ChessNet> = match is_stronger_than_hce {
                         true => Some(enm.clone()),
                         false => None,
                     };
@@ -433,6 +434,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
                     let new_epoch = r_scoreboard.epoch.clone();
                     let fen = uho_lichess[random_range(0..uho_lichess_len)].clone();
                     rayon::spawn(move || {
+                        //play(new_net, new_enm, None, new_tx, new_epoch, false);
                         play(new_net, new_enm, Some(&fen), new_tx, new_epoch, false);
                         INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                     });
@@ -482,8 +484,8 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
                 enm = net.clone();
             }
 
-            if !is_stronger_than_rand && best_win_rate > 0.50 {
-                is_stronger_than_rand = true;
+            if !is_stronger_than_hce && best_win_rate > 0.50 {
+                is_stronger_than_hce = true;
                 best_lose_rate = 100.0;
                 best_win_rate = 0.0;
             }
