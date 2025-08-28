@@ -183,6 +183,7 @@ impl ChessNet {
 
         return best_move;
     }
+
     pub fn negamax(
         &mut self,
         cg: &mut ChessGame,
@@ -208,24 +209,6 @@ impl ChessNet {
             }
         }
 
-        //let mut action_values: Vec<(ChessMove, i16)> = moves.iter().map(|&x| (x, i16::MIN + 1)).collect();
-        //for depth in d..=d {
-        //    for (chess_move, old_value) in action_values.iter_mut() {
-        //        let snapshot = chess_game.cb.explore_state(*chess_move);
-        //        //NOTE: depth instead of depth-1 here so that call to ChessNet::negamax() has implicit depth >= 1.
-        //        let (value, next_move) = negate(chess_game.cb.negamax(-beta, -alpha, depth - 1, 1, self, tt));
-        //        chess_game.cb.restore_state(snapshot);
-        //
-        //        if value > alpha {
-        //            alpha = value;
-        //            best_move = *chess_move;
-        //        }
-        //
-        //        *old_value = value;
-        //    }
-        //
-        //    //action_values.sort_by(|(_, av), (_, bv)| av.cmp(bv));
-        //}
         return best_move;
     }
 
@@ -234,13 +217,31 @@ impl ChessNet {
         cg: &mut ChessGame,
         d: usize,
         ins: &mut Vec<DVf32>,
-        outs: &mut Vec<DVf32>,
+        outs: &mut Vec<i16>,
         moves: &Vec<ChessMove>,
         tt: &mut TranspositionTable,
     ) -> ChessMove {
         ins.push(cg.to_vector());
-        outs.push(self.eval(&cg));
-        return self.negamax(cg, d, moves, tt);
+        assert!(!moves.is_empty() && d > 0);
+        let mut alpha: i16 = i16::MIN + 1;
+        let beta: i16 = i16::MAX - 1;
+        let mut best_move: ChessMove = moves[0].clone();
+
+        for chess_move in moves {
+            //let old_core: ChessBoardCore = chess_game.cb.core.clone();
+            let snapshot = cg.cb.explore_state(*chess_move);
+            //depth instead of depth-1 here so that call to ChessNet::negamax() has implicit depth >= 1.
+            let (value, _next_move) = negate(cg.cb.negamax(-beta, -alpha, d - 1, 1, self, tt));
+            cg.cb.restore_state(snapshot);
+
+            if value > alpha {
+                alpha = value;
+                best_move = *chess_move;
+            }
+        }
+        outs.push(alpha);
+        return best_move;
+        //return self.negamax(cg, d, moves, tt);
     }
 
     pub fn negamax_epsilon(
@@ -257,19 +258,20 @@ impl ChessNet {
         return self.negamax(cg, d, moves, tt);
     }
 
-    pub fn negamax_learn_epsilon(
-        &mut self,
-        cg: &mut ChessGame,
-        d: usize,
-        ins: &mut Vec<DVf32>,
-        outs: &mut Vec<DVf32>,
-        moves: &Vec<ChessMove>,
-        tt: &mut TranspositionTable,
-    ) -> ChessMove {
-        ins.push(cg.to_vector());
-        outs.push(self.eval(&cg));
-        return self.negamax_epsilon(cg, d, moves, tt);
-    }
+    //pub fn negamax_learn_epsilon(
+    //    &mut self,
+    //    cg: &mut ChessGame,
+    //    d: usize,
+    //    ins: &mut Vec<DVf32>,
+    //    outs: &mut Vec<DVf32>,
+    //    moves: &Vec<ChessMove>,
+    //    tt: &mut TranspositionTable,
+    //) -> ChessMove {
+    //    ins.push(cg.to_vector());
+    //    outs.push(self.eval(&cg));
+    //
+    //    return self.negamax_epsilon(cg, d, moves, tt);
+    //}
 
     pub fn process_training_result(&mut self, data: TrainingResult) {
         let total_moves = data.pairs.len();
@@ -279,19 +281,19 @@ impl ChessNet {
             (_, GameResult::Draw) => -0.05,
         };
 
-        let mut ith_move: usize = match data.net_side {
-            Side::White => 0,
-            Side::Black => 1,
-        };
-
+        let mut ith_move: usize = 0;
         /* maybe isolate this? */
-        for (input, output) in data.pairs {
-            let scaled_reward = reward * compute_scalar(ith_move, total_moves);
-            let target_output = DVector::from_element(1, reward);
+        for (input, eval) in data.pairs {
+            //old reward scheme
+            //let scaled_reward = reward * compute_scalar(ith_move, total_moves);
+            //let target_output = DVector::from_element(1, reward);
+            let t: f32 = ith_move as f32 / total_moves as f32;
+            let lerp = (1.0 - t) * (eval.min(1000).max(-1000) as f32 / 1000.0) + t * reward;
+            let target_output = DVector::from_element(1, lerp);
 
-            let grad = self.back_prop_vector(input, target_output, scaled_reward);
+            let grad = self.back_prop_vector(input, target_output, 1.0);
             self.update(grad, -LEARNING_RATE);
-            ith_move += 2;
+            ith_move += 1;
         }
     }
 

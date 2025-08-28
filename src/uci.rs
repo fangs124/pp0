@@ -1,8 +1,4 @@
-use std::{
-    io,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{io, time::Duration};
 
 use chessbb::TranspositionTable;
 

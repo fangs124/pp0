@@ -26,11 +26,11 @@ mod uci;
 
 type GR = GameResult;
 
-const NODE_COUNT: [usize; 3] = [512, 256, 1];
+const NODE_COUNT: [usize; 3] = [256, 128, 1];
 const MAX_INSTANCE: usize = 24;
-const BATCH_SIZE: usize = 5000;
+const BATCH_SIZE: usize = 2000;
 const REVIEW_SIZE: usize = 1000;
-const UPDATE_PER_BATCH: usize = 10;
+const UPDATE_PER_BATCH: usize = 2;
 
 const LEARNING_RATE: f32 = 0.01;
 const FALLBACK_DEPTH: usize = 3;
