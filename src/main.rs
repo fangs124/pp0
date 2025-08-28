@@ -28,11 +28,11 @@ type GR = GameResult;
 
 const NODE_COUNT: [usize; 3] = [256, 128, 1];
 const MAX_INSTANCE: usize = 24;
-const BATCH_SIZE: usize = 2000;
+const BATCH_SIZE: usize = 5000;
 const REVIEW_SIZE: usize = 1000;
 const UPDATE_PER_BATCH: usize = 2;
 
-const LEARNING_RATE: f32 = 0.01;
+const LEARNING_RATE: f32 = 0.001;
 const FALLBACK_DEPTH: usize = 3;
 
 const BASE_TIME: Duration = Duration::from_secs(5);
@@ -48,6 +48,7 @@ enum State {
 }
 
 const IS_ALT: bool = false;
+const START_STRONGER_THAN_RAND: bool = false;
 fn alt_main() -> std::io::Result<()> {
     let file = File::open(format!("{:?}net.json", NODE_COUNT))?;
     let mut buf_reader = BufReader::new(file);
@@ -338,7 +339,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
     let mut batch_count: usize = 0;
     let mut best_lose_rate: f32 = 100.0;
 
-    let mut is_stronger_than_hce = true;
+    let mut is_stronger_than_hce = START_STRONGER_THAN_RAND;
     let mut best_win_rate: f32 = 0.0;
 
     loop {
