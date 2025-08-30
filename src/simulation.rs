@@ -1,6 +1,6 @@
 use std::sync::mpsc::Sender;
 
-use crate::{ChessGame, ChessNet, FALLBACK_DEPTH};
+use crate::{ChessGame, ChessNet, FALLBACK_DEPTH, STUNTED_FALLBACK_DEPTH};
 use chessbb::{ChessMove, GameResult, GameState, Side, TranspositionTable};
 use nalgebra::DVector;
 
@@ -68,7 +68,7 @@ fn play_game(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: bool, fen: 
             while game_state == GameState::Ongoing {
                 let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
                     true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
-                    false => enm.negamax(&mut chess_game, FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
+                    false => enm.negamax_epsilon(&mut chess_game, STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
                 };
 
                 chess_game.update_state(chess_move);
@@ -79,7 +79,7 @@ fn play_game(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: bool, fen: 
             while game_state == GameState::Ongoing {
                 let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
                     true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
-                    false => chess_game.find_move_hce(FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
+                    false => chess_game.find_move_hce(STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
                 };
 
                 chess_game.update_state(chess_move);
@@ -116,7 +116,7 @@ fn learn_game(
                     true => {
                         net.negamax_learn(&mut chess_game, FALLBACK_DEPTH, &mut ins, &mut outs, &moves, &mut tt_net)
                     }
-                    false => enm.negamax_epsilon(&mut chess_game, FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
+                    false => enm.negamax_epsilon(&mut chess_game, STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
                 };
 
                 chess_game.update_state(chess_move);
@@ -129,7 +129,7 @@ fn learn_game(
                     true => {
                         net.negamax_learn(&mut chess_game, FALLBACK_DEPTH, &mut ins, &mut outs, &moves, &mut tt_net)
                     }
-                    false => chess_game.find_move_hce_epsilon(FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
+                    false => chess_game.find_move_hce_epsilon(STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
                 };
 
                 chess_game.update_state(chess_move);
@@ -155,7 +155,7 @@ fn play_game_history(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: boo
             while game_state == GameState::Ongoing {
                 let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
                     true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
-                    false => enm.negamax(&mut chess_game, FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
+                    false => enm.negamax(&mut chess_game, STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
                 };
 
                 history.push(chess_move);
@@ -167,7 +167,7 @@ fn play_game_history(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: boo
             while game_state == GameState::Ongoing {
                 let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
                     true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
-                    false => chess_game.find_move_hce(FALLBACK_DEPTH - 1, &moves, &mut tt_enm),
+                    false => chess_game.find_move_hce(STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
                 };
 
                 history.push(chess_move);

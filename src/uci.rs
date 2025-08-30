@@ -85,15 +85,16 @@ fn uci_position(chess_game: &mut ChessGame, cmd_str: &str) {
             //example:
             //position fen r1b1kbnr/ppp2ppp/3p1q2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 0 1 moves e1g1 f6f2 d4f2 g8h6 f2e1
             //eprintln!("cmd: {:?}", cmd);
-            //chess_game.make_move(cmd);
-            for chess_move in chess_game.try_generate_moves().0 {
-                if chess_move.print_move() == cmd {
-                    //todo: maybe parse into a source/target and do int compare
-                    chess_game.update_state(chess_move);
-                    eprintln!("board:\n\r{}", chess_game.cb);
-                    continue 'a;
-                }
-            }
+            chess_game.make_move(cmd);
+            eprintln!("board:\n\r{}", chess_game.cb);
+            //for chess_move in chess_game.try_generate_moves().0 {
+            //    if chess_move.print_move() == cmd {
+            //        //todo: maybe parse into a source/target and do int compare
+            //        chess_game.update_state(chess_move);
+            //        eprintln!("board:\n\r{}", chess_game.cb);
+            //        continue 'a;
+            //    }
+            //}
         }
     }
 }

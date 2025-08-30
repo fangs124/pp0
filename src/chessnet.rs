@@ -12,7 +12,7 @@ use nalgebra::DVector;
 use rand::{random_bool, random_range};
 use serde::{Deserialize, Serialize};
 
-use crate::{ChessGame, LEARNING_RATE, nnet::*, simulation::TrainingResult};
+use crate::{ChessGame, IS_REG, LEARNING_RATE, nnet::*, simulation::TrainingResult};
 
 const TABLE_SIZE: usize = 1 << 22;
 
@@ -278,20 +278,20 @@ impl ChessNet {
         let reward: f32 = match (data.net_side, data.result) {
             (Side::White, GameResult::WhiteWins) | (Side::Black, GameResult::BlackWins) => 1.0,
             (Side::White, GameResult::BlackWins) | (Side::Black, GameResult::WhiteWins) => -1.0,
-            (_, GameResult::Draw) => -0.05,
+            (_, GameResult::Draw) => -0.1,
         };
 
         let mut ith_move: usize = 0;
         /* maybe isolate this? */
         for (input, eval) in data.pairs {
             //old reward scheme
-            //let scaled_reward = reward * compute_scalar(ith_move, total_moves);
+            let scaled_reward = compute_scalar(ith_move, total_moves);
             //let target_output = DVector::from_element(1, reward);
             let t: f32 = ith_move as f32 / total_moves as f32;
             let lerp = (1.0 - t) * (eval.min(1000).max(-1000) as f32 / 1000.0) + t * reward;
             let target_output = DVector::from_element(1, lerp);
 
-            let grad = self.back_prop_vector(input, target_output, 1.0);
+            let grad = self.back_prop_vector(input, target_output, scaled_reward);
             self.update(grad, -LEARNING_RATE);
             ith_move += 1;
         }
@@ -334,7 +334,7 @@ impl ChessNet {
 
 #[inline(always)]
 fn compute_scalar(index: usize, total: usize) -> f32 {
-    0.8 + (0.2 * (((index) as f32) / (total as f32)))
+    0.75 + (0.25 * (((index) as f32) / (total as f32)))
 }
 
 #[inline(always)]

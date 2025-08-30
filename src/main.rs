@@ -28,12 +28,14 @@ type GR = GameResult;
 
 const NODE_COUNT: [usize; 3] = [256, 128, 1];
 const MAX_INSTANCE: usize = 24;
-const BATCH_SIZE: usize = 5000;
+const BATCH_SIZE: usize = 1000;
 const REVIEW_SIZE: usize = 1000;
-const UPDATE_PER_BATCH: usize = 2;
+const UPDATE_PER_BATCH: usize = 10;
 
 const LEARNING_RATE: f32 = 0.001;
 const FALLBACK_DEPTH: usize = 3;
+const STUNTED_FALLBACK_DEPTH: usize = 2;
+const IS_REG: bool = false;
 
 const BASE_TIME: Duration = Duration::from_secs(5);
 const INCREMENT_TIME: Duration = Duration::from_millis(50);
@@ -49,6 +51,7 @@ enum State {
 
 const IS_ALT: bool = false;
 const START_STRONGER_THAN_RAND: bool = false;
+const FLIP: bool = true;
 fn alt_main() -> std::io::Result<()> {
     let file = File::open(format!("{:?}net.json", NODE_COUNT))?;
     let mut buf_reader = BufReader::new(file);
@@ -427,7 +430,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
                     INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
 
                     let new_net: ChessNet = net.clone();
-                    let new_enm: Option<ChessNet> = match is_stronger_than_hce {
+                    let new_enm: Option<ChessNet> = match is_stronger_than_hce && !FLIP {
                         true => Some(enm.clone()),
                         false => None,
                     };
@@ -485,10 +488,14 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
                 enm = net.clone();
             }
 
-            if !is_stronger_than_hce && best_win_rate > 0.50 {
+            if !is_stronger_than_hce && best_win_rate > 0.50 && !FLIP {
                 is_stronger_than_hce = true;
                 best_lose_rate = 100.0;
                 best_win_rate = 0.0;
+            }
+
+            if FLIP {
+                is_stronger_than_hce = !is_stronger_than_hce;
             }
 
             r_scoreboard.write(&mut stdout)?;
