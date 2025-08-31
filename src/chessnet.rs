@@ -27,14 +27,20 @@ pub struct ChessNet {
 impl Evaluator for ChessNet {
     //TODO fix this so that its not horridly expensive
     fn eval(&mut self, cb: &ChessBoard) -> i16 {
-        self.net.forward_prop_vector(ChessGame::vectorize(cb));
+        self.net.forward_prop_sparse_vec(ChessGame::vectorize_sparse(cb));
         return (self.phi_z()[0] * 1000.0) as i16;
     }
 }
+//old DVector input
+//impl Evaluator for ChessNet {
+//    //TODO fix this so that its not horridly expensive
+//    fn eval(&mut self, cb: &ChessBoard) -> i16 {
+//        self.net.forward_prop_vector(ChessGame::vectorize(cb));
+//        return (self.phi_z()[0] * 1000.0) as i16;
+//    }
+//}
 
 const EPSILON: f64 = 0.4;
-
-type DVf32 = DVector<f32>;
 
 impl ChessNet {
     #[inline(always)]
@@ -50,13 +56,29 @@ impl ChessNet {
     }
 
     #[inline(always)]
+    pub fn eval_sparse(&mut self, cg: &ChessGame) -> DVector<f32> {
+        self.net.forward_prop_sparse(cg);
+        return self.net.phi_z_vector();
+    }
+
+    #[inline(always)]
     pub fn back_prop(&mut self, cg: &ChessGame, target: DVector<f32>, r: f32) -> Gradient {
         self.net.backward_prop(cg, target, r)
     }
 
     #[inline(always)]
+    pub fn back_prop_sparse(&mut self, cg: &ChessGame, target: DVector<f32>, r: f32) -> Gradient {
+        self.net.backward_prop_sparse(cg, target, r)
+    }
+
+    #[inline(always)]
     pub fn back_prop_vector(&mut self, input: DVector<f32>, target: DVector<f32>, r: f32) -> Gradient {
         self.net.backward_prop_vector(input, target, r)
+    }
+
+    #[inline(always)]
+    pub fn back_prop_sparse_vec(&mut self, input: Vec<usize>, target: DVector<f32>, r: f32) -> Gradient {
+        self.net.backward_prop_sparse_vec(input, target, r)
     }
 
     #[inline(always)]
@@ -253,12 +275,12 @@ impl ChessNet {
         &mut self,
         cg: &mut ChessGame,
         d: usize,
-        ins: &mut Vec<DVf32>,
+        ins: &mut Vec<Vec<usize>>,
         outs: &mut Vec<i16>,
         moves: &Vec<ChessMove>,
         tt: &mut TranspositionTable,
     ) -> ChessMove {
-        ins.push(cg.to_vector());
+        ins.push(cg.to_sparse_vec());
         assert!(!moves.is_empty() && d > 0);
         let mut alpha: i16 = i16::MIN + 1;
         let beta: i16 = i16::MAX - 1;
@@ -328,7 +350,7 @@ impl ChessNet {
             let lerp = (1.0 - t) * (eval.min(1000).max(-1000) as f32 / 1000.0) + t * reward;
             let target_output = DVector::from_element(1, lerp);
 
-            let grad = self.back_prop_vector(input, target_output, scaled_reward);
+            let grad = self.back_prop_sparse_vec(input, target_output, scaled_reward);
             self.update(grad, -LEARNING_RATE);
             ith_move += 1;
         }

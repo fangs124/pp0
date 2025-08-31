@@ -9,7 +9,7 @@ pub struct TrainingResult {
     pub result: GameResult,
     pub net_side: Side,
     //pub history: Option<Vec<ChessMove>>,
-    pub pairs: Vec<(DVector<f32>, i16)>, //(input,output)
+    pub pairs: Vec<(Vec<usize>, i16)>, //(input,output)
 }
 
 type TR = TrainingResult;
@@ -25,7 +25,7 @@ pub struct PlayParameter {
 pub fn play(net: ChessNet, enm: Option<ChessNet>, fen: Option<&str>, tx: Sender<TR>, epoch: usize, is_learn: bool) {
     let is_net_white = rand::random_bool(0.5);
     let result: GameResult;
-    let mut pairs: Vec<(DVector<f32>, i16)> = Vec::new();
+    let mut pairs: Vec<(Vec<usize>, i16)> = Vec::new();
     match is_learn {
         true => {
             (result, pairs) = learn_game(net, enm, is_net_white, fen);
@@ -97,13 +97,13 @@ fn learn_game(
     enm: Option<ChessNet>,
     is_net_white: bool,
     fen: Option<&str>,
-) -> (GameResult, Vec<(DVector<f32>, i16)>) {
+) -> (GameResult, Vec<(Vec<usize>, i16)>) {
     let mut chess_game: ChessGame = match fen {
         Some(fen) => ChessGame::from_fen(fen),
         None => ChessGame::start_pos(),
     };
     let (mut moves, mut game_state) = chess_game.try_generate_moves();
-    let mut ins: Vec<DVector<f32>> = Vec::new();
+    let mut ins: Vec<Vec<usize>> = Vec::new();
     let mut outs: Vec<i16> = Vec::new();
     let mut tt_net = TranspositionTable::new();
     let mut tt_enm = TranspositionTable::new();
