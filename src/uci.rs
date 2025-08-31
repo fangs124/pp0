@@ -128,7 +128,7 @@ pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt:
     //    binc.as_millis()
     //);
     //search_position(depth)
-    return format!("bestmove {}", net.iterative_deepening(chess_game, depth, tt, time_left).print_move());
+    return format!("bestmove {}", net.iterative_deepening_no_tt(chess_game, depth, time_left).print_move());
 }
 
 const BASE_COEFF: u32 = 20;

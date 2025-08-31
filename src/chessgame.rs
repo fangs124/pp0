@@ -161,6 +161,24 @@ impl ChessGame {
         }
         return input_data;
     }
+
+    fn encode_sparse(cb: &ChessBoard) -> Vec<usize> {
+        let mut output = Vec::<usize>::with_capacity(32);
+        //position is always encoded from active side's presepctive
+        for (chesspiece, i) in cb.mailbox_iterator().zip(0usize..64) {
+            if let Some(chesspiece) = chesspiece {
+                match cb.side() {
+                    Side::White => {
+                        output.push(ChessGame::index(*chesspiece, Square::nth(i)));
+                    }
+                    Side::Black => {
+                        output.push(ChessGame::index_flip(*chesspiece, Square::nth(i)));
+                    }
+                }
+            }
+        }
+        return output;
+    }
 }
 
 #[inline(always)]
