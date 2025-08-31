@@ -2,7 +2,7 @@ use chessbb::{
     ChessBoard, ChessMove, ChessPiece, GameState, MATERIAL_EVAL, PieceType, Side, Square, TranspositionTable,
 };
 use nalgebra::DVector;
-use nnet::{InputType, SparseInputType, SparseVec};
+use nnet::{InputType, SparseInputType};
 use rand::{random_bool, random_range, seq::SliceRandom};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11,16 +11,15 @@ pub struct ChessGame {
 }
 
 const EPSILON: f64 = 0.4;
-//maximum number of chess pieces in standard chess
-pub const D: usize = 32;
+
 impl InputType for ChessGame {
     fn to_vector(&self) -> DVector<f32> {
         return DVector::<f32>::from_vec(self.encode().to_vec());
     }
 }
 
-impl SparseInputType<D> for ChessGame {
-    fn to_sparse_vec(&self) -> SparseVec<D> {
+impl SparseInputType for ChessGame {
+    fn to_sparse_vec(&self) -> Vec<usize> {
         return ChessGame::encode_sparse(&self.cb);
     }
 }
@@ -169,8 +168,13 @@ impl ChessGame {
         return input_data;
     }
 
-    pub fn encode_sparse(cb: &ChessBoard) -> SparseVec<D> {
-        let mut output = SparseVec::new();
+    #[inline(always)]
+    pub(crate) fn vectorize_sparse(cb: &ChessBoard) -> Vec<usize> {
+        return ChessGame::encode_sparse(cb);
+    }
+
+    fn encode_sparse(cb: &ChessBoard) -> Vec<usize> {
+        let mut output = Vec::<usize>::with_capacity(32);
         //position is always encoded from active side's presepctive
         for (chess_piece, i) in cb.mailbox_iterator().zip(0usize..64) {
             if let Some(chess_piece) = chess_piece {

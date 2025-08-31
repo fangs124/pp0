@@ -12,7 +12,7 @@ use nalgebra::DVector;
 use rand::{random_bool, random_range};
 use serde::{Deserialize, Serialize};
 
-use crate::{ChessGame, IS_REG, LEARNING_RATE, chessgame::D, nnet::*, simulation::TrainingResult};
+use crate::{ChessGame, IS_REG, LEARNING_RATE, nnet::*, simulation::TrainingResult};
 
 const MAX_SEARCH_INSTANCE: usize = 1;
 static SEARCH_INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0_usize);
@@ -27,11 +27,10 @@ pub struct ChessNet {
 impl Evaluator for ChessNet {
     //TODO fix this so that its not horridly expensive
     fn eval(&mut self, cb: &ChessBoard) -> i16 {
-        self.net.forward_prop_sparse_vec(ChessGame::encode_sparse(cb));
+        self.net.forward_prop_sparse_vec(ChessGame::vectorize_sparse(cb));
         return (self.phi_z()[0] * 1000.0) as i16;
     }
 }
-
 //old DVector input
 //impl Evaluator for ChessNet {
 //    //TODO fix this so that its not horridly expensive
@@ -78,7 +77,7 @@ impl ChessNet {
     }
 
     #[inline(always)]
-    pub fn back_prop_sparse_vec(&mut self, input: SparseVec<D>, target: DVector<f32>, r: f32) -> Gradient {
+    pub fn back_prop_sparse_vec(&mut self, input: Vec<usize>, target: DVector<f32>, r: f32) -> Gradient {
         self.net.backward_prop_sparse_vec(input, target, r)
     }
 
@@ -276,7 +275,7 @@ impl ChessNet {
         &mut self,
         cg: &mut ChessGame,
         d: usize,
-        ins: &mut Vec<SparseVec<D>>,
+        ins: &mut Vec<Vec<usize>>,
         outs: &mut Vec<i16>,
         moves: &Vec<ChessMove>,
         tt: &mut TranspositionTable,
