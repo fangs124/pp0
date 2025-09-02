@@ -1,15 +1,15 @@
-use std::sync::mpsc::Sender;
+use std::{sync::mpsc::Sender, time::Duration};
 
 use crate::{ChessGame, ChessNet, FALLBACK_DEPTH, STUNTED_FALLBACK_DEPTH};
 use chessbb::{ChessMove, GameResult, GameState, Side, TranspositionTable};
-use nalgebra::DVector;
+use nnet::SparseVec;
 
 pub struct TrainingResult {
     pub epoch: usize,
     pub result: GameResult,
     pub net_side: Side,
     //pub history: Option<Vec<ChessMove>>,
-    pub pairs: Vec<(Vec<usize>, i16)>, //(input,output)
+    pub pairs: Vec<(SparseVec, i16)>, //(input,output)
 }
 
 type TR = TrainingResult;
@@ -17,208 +17,124 @@ type TR = TrainingResult;
 pub struct PlayParameter {
     epoch: usize,
     is_learn: bool,
-    is_history: bool,
-    enm: Option<ChessNet>,
     fen: Option<String>,
+    tc: Option<TimeControl>,
 }
 
-pub fn play(net: ChessNet, enm: Option<ChessNet>, fen: Option<&str>, tx: Sender<TR>, epoch: usize, is_learn: bool) {
+impl PlayParameter {
+    #[rustfmt::skip]
+    pub fn new(epoch: usize, is_learn: bool, fen: Option<String>, tc: Option<TimeControl>) -> Self{
+        PlayParameter { epoch, is_learn, fen, tc, }
+    }
+}
+
+pub struct TimeControl {
+    base: Duration,
+    increment: Duration,
+}
+
+pub fn play(mut net: ChessNet, mut enm: Option<ChessNet>, tx: Sender<TR>, param: &PlayParameter) {
     let is_net_white = rand::random_bool(0.5);
-    let result: GameResult;
-    let mut pairs: Vec<(Vec<usize>, i16)> = Vec::new();
-    match is_learn {
-        true => {
-            (result, pairs) = learn_game(net, enm, is_net_white, fen);
-        }
-        false => {
-            result = play_game(net, enm, is_net_white, fen);
-        }
-    }
-
-    let net_side: Side = match is_net_white {
-        true => Side::White,
-        false => Side::Black,
-    };
-
-    //let return_data: TrainingResult = match is_learn {
-    //    true => TrainingResult { epoch, result, net_side, history: None, pairs },
-    //    false => TrainingResult { epoch, result, net_side, history: Some(history), pairs },
-    //};
-
-    let return_data: TR = match is_learn {
-        true => TR { epoch, result, net_side, pairs },
-        false => TR { epoch, result, net_side, pairs },
-    };
-    _ = tx.send(return_data);
-}
-
-fn play_game(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: bool, fen: Option<&str>) -> GameResult {
-    let mut chess_game: ChessGame = match fen {
+    let mut chess_game: ChessGame = match &param.fen {
         Some(fen) => ChessGame::from_fen(fen),
         None => ChessGame::start_pos(),
     };
     let (mut moves, mut game_state) = chess_game.try_generate_moves();
-    let mut tt_net = TranspositionTable::new();
-    let mut tt_enm = TranspositionTable::new();
+    assert!(!moves.is_empty());
 
-    // play game
-    match enm.is_some() {
-        true => {
-            let mut enm = enm.unwrap();
-            while game_state == GameState::Ongoing {
-                let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-                    true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
-                    false => enm.negamax_epsilon(&mut chess_game, STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
-                };
-
-                chess_game.update_state(chess_move);
-                (moves, game_state) = chess_game.try_generate_moves();
-            }
-        }
-        false => {
-            while game_state == GameState::Ongoing {
-                let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-                    true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
-                    false => chess_game.find_move_hce(STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
-                };
-
-                chess_game.update_state(chess_move);
-                (moves, game_state) = chess_game.try_generate_moves();
-            }
-        }
-    }
-
-    let GameState::Finished(result) = game_state else { unreachable!() };
-    return result;
-}
-
-fn learn_game(
-    mut net: ChessNet,
-    enm: Option<ChessNet>,
-    is_net_white: bool,
-    fen: Option<&str>,
-) -> (GameResult, Vec<(Vec<usize>, i16)>) {
-    let mut chess_game: ChessGame = match fen {
-        Some(fen) => ChessGame::from_fen(fen),
-        None => ChessGame::start_pos(),
-    };
-    let (mut moves, mut game_state) = chess_game.try_generate_moves();
-    let mut ins: Vec<Vec<usize>> = Vec::new();
+    let mut ins: Vec<SparseVec> = Vec::new();
     let mut outs: Vec<i16> = Vec::new();
     let mut tt_net = TranspositionTable::new();
     let mut tt_enm = TranspositionTable::new();
-    // play game
-    match enm.is_some() {
-        true => {
-            let mut enm = enm.unwrap();
-            while game_state == GameState::Ongoing {
-                let chess_move = match is_net_white == (chess_game.side() == Side::White) {
-                    true => {
-                        net.negamax_learn(&mut chess_game, FALLBACK_DEPTH, &mut ins, &mut outs, &moves, &mut tt_net)
-                    }
-                    false => enm.negamax_epsilon(&mut chess_game, STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
-                };
 
-                chess_game.update_state(chess_move);
-                (moves, game_state) = chess_game.try_generate_moves();
-            }
-        }
-        false => {
-            while game_state == GameState::Ongoing {
-                let chess_move = match is_net_white == (chess_game.side() == Side::White) {
-                    true => {
-                        net.negamax_learn(&mut chess_game, FALLBACK_DEPTH, &mut ins, &mut outs, &moves, &mut tt_net)
-                    }
-                    false => chess_game.find_move_hce_epsilon(STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
-                };
-
-                chess_game.update_state(chess_move);
-                (moves, game_state) = chess_game.try_generate_moves();
-            }
-        }
-    }
-
-    let GameState::Finished(result) = game_state else { unreachable!() };
-    return (result, ins.into_iter().zip(outs).collect());
-}
-
-fn play_game_history(mut net: ChessNet, enm: Option<ChessNet>, is_net_white: bool) -> (GameResult, Vec<ChessMove>) {
-    let mut chess_game = ChessGame::start_pos();
-    let mut history = Vec::new();
-    let (mut moves, mut game_state) = chess_game.try_generate_moves();
-    let mut tt_net = TranspositionTable::new();
-    let mut tt_enm = TranspositionTable::new();
-
-    // play game
-    match enm {
-        Some(mut enm) => {
-            while game_state == GameState::Ongoing {
-                let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-                    true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
-                    false => enm.negamax(&mut chess_game, STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
-                };
-
-                history.push(chess_move);
-                chess_game.update_state(chess_move);
-                (moves, game_state) = chess_game.try_generate_moves();
-            }
-        }
-        None => {
-            while game_state == GameState::Ongoing {
-                let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-                    true => net.negamax(&mut chess_game, FALLBACK_DEPTH, &moves, &mut tt_net),
-                    false => chess_game.find_move_hce(STUNTED_FALLBACK_DEPTH, &moves, &mut tt_enm),
-                };
-
-                history.push(chess_move);
-                chess_game.update_state(chess_move);
-                (moves, game_state) = chess_game.try_generate_moves();
-            }
-        }
-    }
-
-    let GameState::Finished(result) = game_state else { unreachable!() };
-    return (result, history);
-}
-
-//TODO remove this
-
-pub struct TrainingResultSanityTest {
-    pub epoch: usize,
-    pub result: GameResult,
-    pub net_side: Side,
-    pub pairs: Vec<(DVector<f32>, DVector<f32>)>, //(input,output)
-    pub history: Vec<ChessMove>,
-}
-
-pub fn sanity_test(net: &mut ChessNet, tx: Sender<TrainingResultSanityTest>, epoch: usize) {
-    let mut chess_game = ChessGame::start_pos();
-    let is_net_white = rand::random_bool(0.5);
-    let mut tt = TranspositionTable::new();
-
-    let mut history: Vec<ChessMove> = Vec::new();
-    let (mut moves, mut game_state) = chess_game.try_generate_moves();
+    let (find_move_net, find_move_enm) = parse_param(enm.is_some(), param);
 
     // play game
     while game_state == GameState::Ongoing {
-        let chessmove = match is_net_white == (chess_game.side() == Side::White) {
-            true => chess_game.find_move_hce(FALLBACK_DEPTH, &moves, &mut tt),
-            false => chess_game.random_move(),
+        let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
+            true => find_move_net(&mut net, &mut chess_game, &mut ins, &mut outs, moves, &mut tt_net),
+            false => find_move_enm(&mut enm, &mut chess_game, moves, &mut tt_enm),
         };
 
-        chess_game.update_state(chessmove.clone());
-        history.push(chessmove);
+        chess_game.update_state(chess_move);
         (moves, game_state) = chess_game.try_generate_moves();
     }
 
-    // game ended
-    let GameState::Finished(result) = game_state else { panic!() };
+    let GameState::Finished(result) = game_state else { unreachable!() };
+    let pairs: Vec<(SparseVec, i16)> = ins.into_iter().zip(outs).collect();
     let net_side: Side = match is_net_white {
         true => Side::White,
         false => Side::Black,
     };
 
-    let return_data: TrainingResultSanityTest =
-        TrainingResultSanityTest { epoch, result, net_side, pairs: Vec::new(), history };
+    let return_data: TR = match param.is_learn {
+        true => TR { epoch: param.epoch, result, net_side, pairs },
+        false => TR { epoch: param.epoch, result, net_side, pairs },
+    };
     _ = tx.send(return_data);
+}
+
+type NetFindMove = fn(
+    &mut ChessNet,
+    &mut ChessGame,
+    &mut Vec<SparseVec>,
+    &mut Vec<i16>,
+    Vec<ChessMove>,
+    &mut TranspositionTable,
+) -> ChessMove;
+
+type EnmFindMove = fn(&mut Option<ChessNet>, &mut ChessGame, Vec<ChessMove>, &mut TranspositionTable) -> ChessMove;
+
+fn parse_param(enm_is_some: bool, param: &PlayParameter) -> (NetFindMove, EnmFindMove) {
+    let find_move_net: fn(
+        &mut ChessNet,
+        &mut ChessGame,
+        &mut Vec<SparseVec>,
+        &mut Vec<i16>,
+        Vec<ChessMove>,
+        &mut TranspositionTable,
+    ) -> ChessMove = match param.is_learn {
+        true => |net: &mut ChessNet,
+                 chess_game: &mut ChessGame,
+                 ins: &mut Vec<SparseVec>,
+                 outs: &mut Vec<i16>,
+                 moves: Vec<ChessMove>,
+                 tt_net: &mut TranspositionTable| {
+            net.negamax_learn(chess_game, FALLBACK_DEPTH, ins, outs, &moves, tt_net)
+        },
+
+        false => {
+            |net: &mut ChessNet,
+             chess_game: &mut ChessGame,
+             _ins: &mut Vec<SparseVec>,
+             _outs: &mut Vec<i16>,
+             moves: Vec<ChessMove>,
+             tt_net: &mut TranspositionTable| { net.negamax(chess_game, FALLBACK_DEPTH, &moves, tt_net) }
+        }
+    };
+
+    let find_move_enm: fn(&mut Option<ChessNet>, &mut ChessGame, Vec<ChessMove>, &mut TranspositionTable) -> ChessMove =
+        match (enm_is_some, param.is_learn) {
+            (true, _) => |enm: &mut Option<ChessNet>,
+                          chess_game: &mut ChessGame,
+                          moves: Vec<ChessMove>,
+                          tt_enm: &mut TranspositionTable| {
+                enm.as_mut().unwrap().negamax_epsilon(chess_game, STUNTED_FALLBACK_DEPTH, &moves, tt_enm)
+            },
+
+            (false, true) => |_enm: &mut Option<ChessNet>,
+                              chess_game: &mut ChessGame,
+                              moves: Vec<ChessMove>,
+                              tt_enm: &mut TranspositionTable| {
+                chess_game.find_move_hce_epsilon(STUNTED_FALLBACK_DEPTH, &moves, tt_enm)
+            },
+
+            (false, false) => |_enm: &mut Option<ChessNet>,
+                               chess_game: &mut ChessGame,
+                               moves: Vec<ChessMove>,
+                               tt_enm: &mut TranspositionTable| {
+                chess_game.find_move_hce(STUNTED_FALLBACK_DEPTH, &moves, tt_enm)
+            },
+        };
+    return (find_move_net, find_move_enm);
 }

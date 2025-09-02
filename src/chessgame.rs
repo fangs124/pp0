@@ -2,12 +2,12 @@ use chessbb::{
     ChessBoard, ChessMove, ChessPiece, GameState, MATERIAL_EVAL, PieceType, Side, Square, TranspositionTable,
 };
 use nalgebra::DVector;
-use nnet::{InputType, SparseInputType};
+use nnet::{InputType, SparseInputType, SparseVec};
 use rand::{random_bool, random_range, seq::SliceRandom};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChessGame {
-    pub(crate) cb: ChessBoard,
+    pub cb: ChessBoard,
 }
 
 const EPSILON: f64 = 0.4;
@@ -19,7 +19,7 @@ impl InputType for ChessGame {
 }
 
 impl SparseInputType for ChessGame {
-    fn to_sparse_vec(&self) -> Vec<usize> {
+    fn to_sparse_vec(&self) -> SparseVec {
         return ChessGame::encode_sparse(&self.cb);
     }
 }
@@ -61,10 +61,7 @@ impl ChessGame {
     }
 
     pub fn find_move_hce_epsilon(
-        &mut self,
-        d: usize,
-        moves: &Vec<ChessMove>,
-        tt: &mut TranspositionTable,
+        &mut self, d: usize, moves: &Vec<ChessMove>, tt: &mut TranspositionTable,
     ) -> ChessMove {
         assert!(!moves.is_empty());
         if random_bool(EPSILON) {
@@ -169,12 +166,12 @@ impl ChessGame {
     }
 
     #[inline(always)]
-    pub(crate) fn vectorize_sparse(cb: &ChessBoard) -> Vec<usize> {
+    pub fn vectorize_sparse(cb: &ChessBoard) -> SparseVec {
         return ChessGame::encode_sparse(cb);
     }
 
-    fn encode_sparse(cb: &ChessBoard) -> Vec<usize> {
-        let mut output = Vec::<usize>::with_capacity(32);
+    fn encode_sparse(cb: &ChessBoard) -> SparseVec {
+        let mut output = SparseVec::with_capacity(32);
         //position is always encoded from active side's presepctive
         for (chess_piece, i) in cb.mailbox_iterator().zip(0usize..64) {
             if let Some(chess_piece) = chess_piece {

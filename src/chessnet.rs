@@ -77,7 +77,7 @@ impl ChessNet {
     }
 
     #[inline(always)]
-    pub fn back_prop_sparse_vec(&mut self, input: Vec<usize>, target: DVector<f32>, r: f32) -> Gradient {
+    pub fn back_prop_sparse_vec(&mut self, input: SparseVec, target: DVector<f32>, r: f32) -> Gradient {
         self.net.backward_prop_sparse_vec(input, target, r)
     }
 
@@ -92,11 +92,7 @@ impl ChessNet {
     }
 
     pub fn iterative_deepening_hot(
-        &mut self,
-        cg: &mut ChessGame,
-        moves: Vec<ChessMove>,
-        tt: &mut TranspositionTable,
-        time_limit: Duration,
+        &mut self, cg: &mut ChessGame, moves: Vec<ChessMove>, tt: &mut TranspositionTable, time_limit: Duration,
     ) -> ChessMove {
         assert!(!moves.is_empty());
         let now = Instant::now();
@@ -110,11 +106,7 @@ impl ChessNet {
     }
 
     pub fn iterative_deepening(
-        &mut self,
-        cg: &mut ChessGame,
-        max_depth: Option<usize>,
-        tt: &mut TranspositionTable,
-        time_limit: Duration,
+        &mut self, cg: &mut ChessGame, max_depth: Option<usize>, tt: &mut TranspositionTable, time_limit: Duration,
     ) -> ChessMove {
         let now = Instant::now();
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
@@ -150,10 +142,7 @@ impl ChessNet {
     }
 
     pub fn iterative_deepening_no_tt(
-        &mut self,
-        cg: &mut ChessGame,
-        max_depth: Option<usize>,
-        time_limit: Duration,
+        &mut self, cg: &mut ChessGame, max_depth: Option<usize>, time_limit: Duration,
     ) -> ChessMove {
         let now = Instant::now();
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
@@ -189,10 +178,7 @@ impl ChessNet {
     }
 
     pub fn _iterative_deepening(
-        &mut self,
-        cg: &mut ChessGame,
-        max_depth: Option<usize>,
-        tt: Arc<Mutex<TranspositionTable>>,
+        &mut self, cg: &mut ChessGame, max_depth: Option<usize>, tt: Arc<Mutex<TranspositionTable>>,
         time_limit: Duration,
     ) -> ChessMove {
         let now = Instant::now();
@@ -244,11 +230,7 @@ impl ChessNet {
     }
 
     pub fn negamax(
-        &mut self,
-        cg: &mut ChessGame,
-        d: usize,
-        moves: &Vec<ChessMove>,
-        tt: &mut TranspositionTable,
+        &mut self, cg: &mut ChessGame, d: usize, moves: &Vec<ChessMove>, tt: &mut TranspositionTable,
     ) -> ChessMove {
         assert!(!moves.is_empty() && d > 0);
         let mut alpha: i16 = i16::MIN + 1;
@@ -272,12 +254,7 @@ impl ChessNet {
     }
 
     pub fn negamax_learn(
-        &mut self,
-        cg: &mut ChessGame,
-        d: usize,
-        ins: &mut Vec<Vec<usize>>,
-        outs: &mut Vec<i16>,
-        moves: &Vec<ChessMove>,
+        &mut self, cg: &mut ChessGame, d: usize, ins: &mut Vec<SparseVec>, outs: &mut Vec<i16>, moves: &Vec<ChessMove>,
         tt: &mut TranspositionTable,
     ) -> ChessMove {
         ins.push(cg.to_sparse_vec());
@@ -304,11 +281,7 @@ impl ChessNet {
     }
 
     pub fn negamax_epsilon(
-        &mut self,
-        cg: &mut ChessGame,
-        d: usize,
-        moves: &Vec<ChessMove>,
-        tt: &mut TranspositionTable,
+        &mut self, cg: &mut ChessGame, d: usize, moves: &Vec<ChessMove>, tt: &mut TranspositionTable,
     ) -> ChessMove {
         assert!(!moves.is_empty());
         if random_bool(EPSILON) {
@@ -347,10 +320,10 @@ impl ChessNet {
             let scaled_reward = compute_scalar(ith_move, total_moves);
             //let target_output = DVector::from_element(1, reward);
             let t: f32 = ith_move as f32 / total_moves as f32;
-            let lerp = (1.0 - t) * (eval.min(1000).max(-1000) as f32 / 1000.0) + t * reward;
+            let lerp = (1.0 - t.powi(8)) * (eval.min(1000).max(-1000) as f32 / 1000.0) + t.powi(8) * reward;
             let target_output = DVector::from_element(1, lerp);
 
-            let grad = self.back_prop_sparse_vec(input, target_output, scaled_reward);
+            let grad = self.back_prop_sparse_vec(input, target_output, 1.0);
             self.update(grad, -LEARNING_RATE);
             ith_move += 1;
         }

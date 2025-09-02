@@ -13,7 +13,7 @@ use termion::{async_stdin, clear, cursor};
 pub use crate::chessgame::ChessGame;
 pub use crate::chessnet::ChessNet;
 use crate::scoreboard::ScoreBoard;
-use crate::simulation::{TrainingResult, TrainingResultSanityTest, play, sanity_test};
+use crate::simulation::{PlayParameter, TrainingResult, play};
 
 extern crate chessbb;
 extern crate nnet;
@@ -26,15 +26,15 @@ mod uci;
 
 type GR = GameResult;
 
-const NODE_COUNT: [usize; 3] = [256, 64, 1];
+const NODE_COUNT: [usize; 3] = [128, 16, 1];
 const MAX_INSTANCE: usize = 24;
-const BATCH_SIZE: usize = 10000;
-const REVIEW_SIZE: usize = 1000;
+const BATCH_SIZE: usize = 100000; //~4.8 Mil
+const REVIEW_SIZE: usize = 10000;
 const UPDATE_PER_BATCH: usize = 2;
 
-const LEARNING_RATE: f32 = 0.001;
+const LEARNING_RATE: f32 = 0.00001;
 const FALLBACK_DEPTH: usize = 3;
-const STUNTED_FALLBACK_DEPTH: usize = 2;
+const STUNTED_FALLBACK_DEPTH: usize = 1;
 const IS_REG: bool = false;
 
 const BASE_TIME: Duration = Duration::from_secs(5);
@@ -105,209 +105,6 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn train_sanity_test(net: &mut ChessNet) -> std::io::Result<()> {
-    let mut game_samples: Vec<(Vec<ChessMove>, Side)> = Vec::new();
-    let mut is_sanity_sample_printed = false;
-    let f = File::create(format!("{:?}.log", NODE_COUNT)).unwrap();
-    let mut f_buff: BufWriter<&File> = BufWriter::new(&f);
-
-    let mut stream_out = BufWriter::new(std::io::stdout());
-    //let mut stdout = std::io::stdout();
-    let mut stdout = std::io::stdout().lock();
-    let mut stdin = async_stdin().bytes();
-
-    let mut enm: ChessNet = net.clone();
-
-    //TODO
-    let mut scoreboard: ScoreBoard = ScoreBoard::new(net.version, enm.version);
-    let mut r_scoreboard: ScoreBoard = ScoreBoard::new(net.version, enm.version);
-    let (tx, rx) = mpsc::channel::<TrainingResultSanityTest>();
-
-    write!(stdout, "{}", clear::All)?;
-    stdout.flush()?;
-
-    //* training statistics */
-    let mut discarded_count: usize = 0;
-    let mut training_results: Vec<TrainingResultSanityTest> = Vec::new();
-    let mut finish_count: usize = 0;
-    let mut batch_count: usize = 0;
-    let mut best_lose_rate: f32 = 100.0;
-
-    let mut is_stronger_than_hce = false;
-    let mut best_win_rate: f32 = 0.0;
-
-    loop {
-        write!(stdout, "{}Press q to stop.{}\n\r", cursor::Goto(1, 1), cursor::Goto(1, 14))?;
-        //listen to 'q' for interupt
-        let b = stdin.next();
-        if let Some(Ok(b'q')) = b {
-            break;
-        }
-
-        //launch a game if there are idle threads
-        if INSTANCE_COUNT.load(Ordering::SeqCst) <= MAX_INSTANCE {
-            INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
-            let mut new_net: ChessNet = net.clone();
-            let new_tx = tx.clone();
-            let new_epoch = scoreboard.epoch.clone();
-            rayon::spawn(move || {
-                sanity_test(&mut new_net, new_tx, new_epoch);
-                INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
-                RETURN_COUNT.fetch_add(1_usize, Ordering::SeqCst);
-            });
-        }
-
-        //retrieve data
-        while let Ok(data) = rx.try_recv() {
-            if data.epoch == scoreboard.epoch {
-                finish_count += 1;
-                match (data.net_side, data.result) {
-                    //net wins
-                    (Side::White, GR::WhiteWins) | (Side::Black, GR::BlackWins) => scoreboard.wins += 1,
-                    //net losses
-                    (Side::White, GR::BlackWins) | (Side::Black, GR::WhiteWins) => scoreboard.losses += 1,
-                    //net draws
-                    (_, GameResult::Draw) => scoreboard.draws += 1,
-                }
-                training_results.push(data);
-            } else {
-                discarded_count += 1;
-            }
-        }
-
-        //update net
-        if finish_count >= BATCH_SIZE {
-            scoreboard.epoch += 1;
-            finish_count = 0;
-            training_results = Vec::new();
-            batch_count += 1;
-        }
-
-        //do io + review
-        if batch_count >= UPDATE_PER_BATCH {
-            net.version += 1;
-            batch_count = 0;
-
-            //note: Goto(n,m) -> column n, row m
-            //terminal stuff
-            write!(stdout, "{}{}{}{}", cursor::Goto(1, 2), clear::CurrentLine, cursor::Goto(1, 3), clear::CurrentLine)?;
-            write!(stdout, "{}{}{}{}", cursor::Goto(1, 4), clear::CurrentLine, cursor::Goto(1, 5), clear::CurrentLine)?;
-            write!(stdout, "{}{}{}{}", cursor::Goto(1, 6), clear::CurrentLine, cursor::Goto(1, 7), clear::CurrentLine)?;
-            write!(stdout, "{}======== training result! ========\n\r", cursor::Goto(1, 2))?;
-            write!(stdout, "discarded {}, threads finished: {}", discarded_count, RETURN_COUNT.load(Ordering::SeqCst))?;
-            write!(stdout, ", stronger than rand: {}\n\r", is_stronger_than_hce)?;
-            scoreboard.write(&mut stdout)?;
-            scoreboard.write_to_buf(&mut f_buff)?;
-            stream_out.flush()?;
-            f_buff.flush()?;
-            scoreboard.update();
-            //review if net is stronger
-            let (tx_r, rx_r) = mpsc::channel::<TrainingResultSanityTest>();
-            let mut review_match_count: usize = 0;
-            r_scoreboard.epoch = scoreboard.epoch;
-            while review_match_count < REVIEW_SIZE {
-                //launch a game if there are idle threads
-                if INSTANCE_COUNT.load(Ordering::SeqCst) < MAX_INSTANCE {
-                    INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
-
-                    let mut new_net: ChessNet = net.clone();
-
-                    let new_tx = tx_r.clone();
-                    let new_epoch = r_scoreboard.epoch.clone();
-                    rayon::spawn(move || {
-                        sanity_test(&mut new_net, new_tx, new_epoch);
-                        INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
-                    });
-                }
-
-                while let Ok(data) = rx_r.try_recv() {
-                    if data.epoch == r_scoreboard.epoch {
-                        review_match_count += 1;
-                        match (data.net_side, data.result) {
-                            //net wins
-                            (Side::White, GR::WhiteWins) | (Side::Black, GR::BlackWins) => r_scoreboard.wins += 1,
-                            //net losses
-                            (Side::White, GR::BlackWins) | (Side::Black, GR::WhiteWins) => {
-                                if game_samples.len() <= 5 {
-                                    game_samples.push((data.history, data.net_side))
-                                }
-                                r_scoreboard.losses += 1
-                            }
-                            //net draws
-                            (_, GameResult::Draw) => r_scoreboard.draws += 1,
-                        }
-                    }
-                }
-            }
-
-            // review games finished
-            #[rustfmt::skip]
-            write!(stdout, "{}{}{}{}", cursor::Goto(1, 8), clear::CurrentLine, cursor::Goto(1, 9), clear::CurrentLine)?;
-            #[rustfmt::skip]
-            write!(stdout, "{}{}{}{}", cursor::Goto(1,10), clear::CurrentLine, cursor::Goto(1,11), clear::CurrentLine)?;
-            #[rustfmt::skip]
-            write!(stdout, "{}{}{}{}", cursor::Goto(1,12), clear::CurrentLine, cursor::Goto(1,13), clear::CurrentLine)?;
-
-            write!(stdout, "{}======= reviewing net v.{}! =======\n\r", cursor::Goto(1, 8), net.version)?;
-            let new_win_rate: f32 = (r_scoreboard.wins as f32) / (review_match_count as f32);
-            let new_lose_rate: f32 = (r_scoreboard.losses as f32) / (review_match_count as f32);
-            if new_win_rate > best_win_rate {
-                best_win_rate = new_win_rate;
-                enm = net.clone();
-            }
-            #[rustfmt::skip]
-            write!(stdout, "lose rate: {:.2}% (best: {:.2}%)", new_lose_rate * 100.0, best_lose_rate * 100.0, )?;
-            write!(stdout, ", best win rate: {:.2}\n\r", best_win_rate)?;
-
-            if new_lose_rate < best_lose_rate {
-                best_lose_rate = new_lose_rate;
-                enm = net.clone();
-            }
-
-            if !is_stronger_than_hce && best_win_rate > 0.50 {
-                is_stronger_than_hce = true;
-                best_lose_rate = 100.0;
-                best_win_rate = 0.0;
-            }
-
-            r_scoreboard.write(&mut stdout)?;
-            stream_out.flush()?;
-            f_buff.flush()?;
-            r_scoreboard.update();
-
-            r_scoreboard.net1_ver = net.version;
-            scoreboard.net1_ver = net.version;
-            scoreboard.net2_ver = enm.version;
-        }
-
-        if !is_sanity_sample_printed && game_samples.len() >= 5 {
-            let mut game_number = 0;
-            let f = File::create(format!("gamesamples.log")).unwrap();
-            let mut f_buff: BufWriter<&File> = BufWriter::new(&f);
-            for (chessmoves, side) in &game_samples {
-                write!(f_buff, "game number {game_number}:\n\r")?;
-                let print_side = match side {
-                    Side::White => "White",
-                    Side::Black => "Black",
-                };
-                write!(f_buff, "net_side: {}\n\r", print_side)?;
-                for chess_move in chessmoves {
-                    writeln!(f_buff, "{}", chess_move.print_move())?;
-                }
-                game_number += 1;
-                //f_buff.flush();
-            }
-            is_sanity_sample_printed = true;
-            //break;
-        }
-    }
-    write!(stdout, "{}{}", clear::All, cursor::Goto(1, 1))?;
-    let enm_file = File::create(format!("{:?}value_net_enm.json", NODE_COUNT))?;
-    serde_json::to_writer(enm_file, &enm)?;
-    stdout.flush()?;
-    Ok(())
-}
-
 fn train(net: &mut ChessNet) -> std::io::Result<()> {
     //let mut game_samples: Vec<(Vec<ChessMove>, Side)> = Vec::new();
     //let mut is_sanity_sample_printed = false;
@@ -323,7 +120,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
     //let mut stdout = std::io::stdout();
     let mut stdout: termion::raw::RawTerminal<std::io::StdoutLock<'static>> =
         std::io::stdout().lock().into_raw_mode().unwrap();
-    let mut stdin = async_stdin().bytes();
+    let mut stdin: std::io::Bytes<termion::AsyncReader> = async_stdin().bytes();
 
     let mut enm: ChessNet = net.clone();
 
@@ -365,8 +162,9 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             let new_epoch = scoreboard.epoch.clone();
             let fen = uho_lichess[random_range(0..uho_lichess_len)].clone();
             rayon::spawn(move || {
+                let param = PlayParameter::new(new_epoch, true, Some(fen), None);
                 //play(new_net, new_enm, None, new_tx, new_epoch, true);
-                play(new_net, new_enm, Some(&fen), new_tx, new_epoch, true);
+                play(new_net, new_enm, new_tx, &param);
                 INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                 RETURN_COUNT.fetch_add(1_usize, Ordering::SeqCst);
             });
@@ -438,8 +236,9 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
                     let new_epoch = r_scoreboard.epoch.clone();
                     let fen = uho_lichess[random_range(0..uho_lichess_len)].clone();
                     rayon::spawn(move || {
+                        let param = PlayParameter::new(new_epoch, false, Some(fen), None);
                         //play(new_net, new_enm, None, new_tx, new_epoch, false);
-                        play(new_net, new_enm, Some(&fen), new_tx, new_epoch, false);
+                        play(new_net, new_enm, new_tx, &param);
                         INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                     });
                 }
@@ -481,7 +280,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             }
             #[rustfmt::skip]
             write!(stdout, "lose rate: {:.2}% (best: {:.2}%)", new_lose_rate * 100.0, best_lose_rate * 100.0, )?;
-            write!(stdout, ", best win rate: {:.2}\n\r", best_win_rate)?;
+            write!(stdout, ", best win rate: {:.2}\n\r", best_win_rate * 100.0)?;
 
             if new_lose_rate < best_lose_rate {
                 best_lose_rate = new_lose_rate;
