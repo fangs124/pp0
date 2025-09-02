@@ -109,10 +109,10 @@ pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt:
     while let Some(cmd) = cmds.next() {
         match cmd {
             "depth" => depth = Some(cmds.next().unwrap().parse::<usize>().unwrap()),
-            "wtime" => wtime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap()),
-            "btime" => btime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap()),
-            "winc" => winc = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap()),
-            "binc" => binc = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap()),
+            "wtime" => wtime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(600000)),
+            "btime" => btime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(600000)),
+            "winc" => winc = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(600000)),
+            "binc" => binc = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(600000)),
             _ => (),
         }
     }
