@@ -86,13 +86,12 @@ impl ChessNet {
         self.net.phi_z()
     }
 
-    pub fn negamax_cold(&mut self, cg: &ChessGame, d: usize, tt: &mut TranspositionTable) -> ChessMove {
-        //TODO safety of the return result?
-        cg.clone().cb.negamax(i16::MIN + 1, i16::MAX - 1, d, 0, self, tt).1.unwrap()
-    }
-
     pub fn iterative_deepening_hot(
-        &mut self, cg: &mut ChessGame, moves: Vec<ChessMove>, tt: &mut TranspositionTable, time_limit: Duration,
+        &mut self,
+        cg: &mut ChessGame,
+        moves: Vec<ChessMove>,
+        tt: &mut TranspositionTable,
+        time_limit: Duration,
     ) -> ChessMove {
         assert!(!moves.is_empty());
         let now = Instant::now();
@@ -106,7 +105,11 @@ impl ChessNet {
     }
 
     pub fn iterative_deepening(
-        &mut self, cg: &mut ChessGame, max_depth: Option<usize>, tt: &mut TranspositionTable, time_limit: Duration,
+        &mut self,
+        cg: &mut ChessGame,
+        max_depth: Option<usize>,
+        tt: &mut TranspositionTable,
+        time_limit: Duration,
     ) -> ChessMove {
         let now = Instant::now();
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
@@ -142,7 +145,10 @@ impl ChessNet {
     }
 
     pub fn iterative_deepening_no_tt(
-        &mut self, cg: &mut ChessGame, max_depth: Option<usize>, time_limit: Duration,
+        &mut self,
+        cg: &mut ChessGame,
+        max_depth: Option<usize>,
+        time_limit: Duration,
     ) -> ChessMove {
         let now = Instant::now();
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
@@ -154,6 +160,7 @@ impl ChessNet {
             None => usize::MAX,
         };
         let mut d = 1;
+        let mut node_count: usize = 0;
         while now.elapsed() < time_limit && d <= max_depth {
             if SEARCH_INSTANCE_COUNT.load(Ordering::SeqCst) <= MAX_SEARCH_INSTANCE {
                 SEARCH_INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -163,6 +170,7 @@ impl ChessNet {
                 let moves_new = moves.clone();
                 rayon::spawn(move || {
                     let mut tt_new = TranspositionTable::new();
+                    let mut node_count: usize = 0;
                     _ = tx_new.send(net.negamax(&mut cg_new, d, &moves_new, &mut tt_new));
                     SEARCH_INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                 });
@@ -178,7 +186,10 @@ impl ChessNet {
     }
 
     pub fn _iterative_deepening(
-        &mut self, cg: &mut ChessGame, max_depth: Option<usize>, tt: Arc<Mutex<TranspositionTable>>,
+        &mut self,
+        cg: &mut ChessGame,
+        max_depth: Option<usize>,
+        tt: Arc<Mutex<TranspositionTable>>,
         time_limit: Duration,
     ) -> ChessMove {
         let now = Instant::now();
@@ -230,18 +241,23 @@ impl ChessNet {
     }
 
     pub fn negamax(
-        &mut self, cg: &mut ChessGame, d: usize, moves: &Vec<ChessMove>, tt: &mut TranspositionTable,
+        &mut self,
+        cg: &mut ChessGame,
+        d: usize,
+        moves: &Vec<ChessMove>,
+        tt: &mut TranspositionTable,
     ) -> ChessMove {
         assert!(!moves.is_empty() && d > 0);
         let mut alpha: i16 = i16::MIN + 1;
         let beta: i16 = i16::MAX - 1;
         let mut best_move: ChessMove = moves[0].clone();
+        let mut node_count: usize = 1;
 
         for chess_move in moves {
             //let old_core: ChessBoardCore = chess_game.cb.core.clone();
             let snapshot = cg.cb.explore_state(*chess_move);
             //depth instead of depth-1 here so that call to ChessNet::negamax() has implicit depth >= 1.
-            let (value, _next_move) = negate(cg.cb.negamax(-beta, -alpha, d - 1, 1, self, tt));
+            let (value, _next_move) = negate(cg.cb.negamax(-beta, -alpha, d - 1, 1, self, tt, &mut node_count));
             cg.cb.restore_state(snapshot);
 
             if value > alpha {
@@ -254,7 +270,12 @@ impl ChessNet {
     }
 
     pub fn negamax_learn(
-        &mut self, cg: &mut ChessGame, d: usize, ins: &mut Vec<SparseVec>, outs: &mut Vec<i16>, moves: &Vec<ChessMove>,
+        &mut self,
+        cg: &mut ChessGame,
+        d: usize,
+        ins: &mut Vec<SparseVec>,
+        outs: &mut Vec<i16>,
+        moves: &Vec<ChessMove>,
         tt: &mut TranspositionTable,
     ) -> ChessMove {
         ins.push(cg.to_sparse_vec());
@@ -262,12 +283,12 @@ impl ChessNet {
         let mut alpha: i16 = i16::MIN + 1;
         let beta: i16 = i16::MAX - 1;
         let mut best_move: ChessMove = moves[0].clone();
-
+        let mut node_count: usize = 1;
         for chess_move in moves {
             //let old_core: ChessBoardCore = chess_game.cb.core.clone();
             let snapshot = cg.cb.explore_state(*chess_move);
             //depth instead of depth-1 here so that call to ChessNet::negamax() has implicit depth >= 1.
-            let (value, _next_move) = negate(cg.cb.negamax(-beta, -alpha, d - 1, 1, self, tt));
+            let (value, _next_move) = negate(cg.cb.negamax(-beta, -alpha, d - 1, 1, self, tt, &mut node_count));
             cg.cb.restore_state(snapshot);
 
             if value > alpha {
@@ -281,7 +302,11 @@ impl ChessNet {
     }
 
     pub fn negamax_epsilon(
-        &mut self, cg: &mut ChessGame, d: usize, moves: &Vec<ChessMove>, tt: &mut TranspositionTable,
+        &mut self,
+        cg: &mut ChessGame,
+        d: usize,
+        moves: &Vec<ChessMove>,
+        tt: &mut TranspositionTable,
     ) -> ChessMove {
         assert!(!moves.is_empty());
         if random_bool(EPSILON) {

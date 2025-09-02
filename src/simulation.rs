@@ -103,14 +103,14 @@ fn parse_param(enm_is_some: bool, param: &PlayParameter) -> (NetFindMove, EnmFin
             net.negamax_learn(chess_game, FALLBACK_DEPTH, ins, outs, &moves, tt_net)
         },
 
-        false => {
-            |net: &mut ChessNet,
-             chess_game: &mut ChessGame,
-             _ins: &mut Vec<SparseVec>,
-             _outs: &mut Vec<i16>,
-             moves: Vec<ChessMove>,
-             tt_net: &mut TranspositionTable| { net.negamax(chess_game, FALLBACK_DEPTH, &moves, tt_net) }
-        }
+        false => |net: &mut ChessNet,
+                  chess_game: &mut ChessGame,
+                  _ins: &mut Vec<SparseVec>,
+                  _outs: &mut Vec<i16>,
+                  moves: Vec<ChessMove>,
+                  tt_net: &mut TranspositionTable| {
+            chess_game.negamax(FALLBACK_DEPTH, net, tt_net, &mut 0, Some((moves, GameState::Ongoing)))
+        },
     };
 
     let find_move_enm: fn(&mut Option<ChessNet>, &mut ChessGame, Vec<ChessMove>, &mut TranspositionTable) -> ChessMove =

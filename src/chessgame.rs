@@ -1,5 +1,5 @@
 use chessbb::{
-    ChessBoard, ChessMove, ChessPiece, GameState, MATERIAL_EVAL, PieceType, Side, Square, TranspositionTable,
+    ChessBoard, ChessMove, ChessPiece, Evaluator, GameState, MATERIAL_EVAL, PieceType, Side, Square, TranspositionTable,
 };
 use nalgebra::DVector;
 use nnet::{InputType, SparseInputType, SparseVec};
@@ -61,7 +61,10 @@ impl ChessGame {
     }
 
     pub fn find_move_hce_epsilon(
-        &mut self, d: usize, moves: &Vec<ChessMove>, tt: &mut TranspositionTable,
+        &mut self,
+        d: usize,
+        moves: &Vec<ChessMove>,
+        tt: &mut TranspositionTable,
     ) -> ChessMove {
         assert!(!moves.is_empty());
         if random_bool(EPSILON) {
@@ -76,7 +79,7 @@ impl ChessGame {
         let mut alpha: i16 = i16::MIN + 1;
         let b: i16 = i16::MAX - 1;
         let mut best_move: ChessMove = moves[0].clone();
-        let mut moves = moves.clone();
+        let mut moves: Vec<ChessMove> = moves.clone();
         moves.shuffle(&mut rand::rng());
         for chess_move in moves {
             let snapshot = self.cb.explore_state(chess_move);
@@ -90,6 +93,18 @@ impl ChessGame {
             }
         }
         return best_move;
+    }
+
+    #[inline(always)]
+    pub fn negamax(
+        &mut self,
+        d: usize,
+        ev: &mut impl Evaluator,
+        tt: &mut TranspositionTable,
+        node_count: &mut usize,
+        pair: Option<(Vec<ChessMove>, GameState)>,
+    ) -> (i16, Option<ChessMove>) {
+        self.cb.negamax(i16::MIN + 1, i16::MAX - 1, d, 0, ev, tt, node_count, pair)
     }
 
     #[inline(always)]
