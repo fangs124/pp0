@@ -1,16 +1,12 @@
-use chessbb::{
-    ChessBoard, ChessMove, ChessPiece, Evaluator, GameState, MATERIAL_EVAL, PieceType, Side, Square, TranspositionTable,
-};
+use chessbb::{ChessBoard, ChessMove, ChessPiece, Evaluator, GameState, PieceType, Side, Square, TranspositionTable};
 use nalgebra::DVector;
 use nnet::{InputType, SparseInputType, SparseVec};
-use rand::{random_bool, random_range, seq::SliceRandom};
+use rand::random_range;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChessGame {
     pub cb: ChessBoard,
 }
-
-const EPSILON: f64 = 0.4;
 
 impl InputType for ChessGame {
     fn to_vector(&self) -> DVector<f32> {
@@ -50,61 +46,23 @@ impl ChessGame {
         return self.cb.try_generate_moves();
     }
 
-    //#[inline(always)]
-    //pub fn state(&self) -> GameState {
-    //    return self.cb.state();
-    //}
-
     #[inline(always)]
     pub fn update_state(&mut self, chess_move: ChessMove) {
         self.cb.update_state(chess_move);
     }
 
-    pub fn find_move_hce_epsilon(
-        &mut self,
-        d: usize,
-        moves: &Vec<ChessMove>,
-        tt: &mut TranspositionTable,
-    ) -> ChessMove {
-        assert!(!moves.is_empty());
-        if random_bool(EPSILON) {
-            return moves[random_range(0..moves.len())];
-        }
-        return self.find_move_hce(d, moves, tt);
-    }
-
-    //#[rustfmt::skip]
-    pub fn find_move_hce(&mut self, d: usize, moves: &Vec<ChessMove>, tt: &mut TranspositionTable) -> ChessMove {
-        assert!(!moves.is_empty() && d > 0);
-        let mut alpha: i16 = i16::MIN + 1;
-        let b: i16 = i16::MAX - 1;
-        let mut best_move: ChessMove = moves[0].clone();
-        let mut moves: Vec<ChessMove> = moves.clone();
-        moves.shuffle(&mut rand::rng());
-        for chess_move in moves {
-            let snapshot = self.cb.explore_state(chess_move);
-            //NOTE: depth instead of depth-1 here so that call to ChessNet::negamax() has implicit depth >= 1.
-            let (value, _next_move) = negate(self.cb.negamax(-b, -alpha, d - 1, 1, &mut MATERIAL_EVAL, tt));
-            self.cb.restore_state(snapshot);
-
-            if value > alpha {
-                alpha = value;
-                best_move = chess_move;
-            }
-        }
-        return best_move;
+    #[inline(always)]
+    pub fn negamax(
+        &mut self, d: usize, ev: &mut impl Evaluator, tt: &mut TranspositionTable, node_count: &mut usize, pair: Option<(Vec<ChessMove>, GameState)>,
+    ) -> (i16, Option<ChessMove>) {
+        self.cb.negamax(i16::MIN + 1, i16::MAX - 1, d, 0, ev, tt, node_count, pair).unwrap()
     }
 
     #[inline(always)]
-    pub fn negamax(
-        &mut self,
-        d: usize,
-        ev: &mut impl Evaluator,
-        tt: &mut TranspositionTable,
-        node_count: &mut usize,
-        pair: Option<(Vec<ChessMove>, GameState)>,
-    ) -> (i16, Option<ChessMove>) {
-        self.cb.negamax(i16::MIN + 1, i16::MAX - 1, d, 0, ev, tt, node_count, pair)
+    pub fn find_move(&mut self, d: usize, ev: &mut impl Evaluator, node_count: &mut usize, moves: Vec<ChessMove>, tt: &mut TranspositionTable) -> ChessMove {
+        assert!(moves.len() > 0);
+        let chess_move: ChessMove = moves[0].clone();
+        return self.negamax(d, ev, tt, node_count, Some((moves, GameState::Ongoing))).1.unwrap_or(chess_move);
     }
 
     #[inline(always)]

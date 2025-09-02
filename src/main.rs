@@ -118,8 +118,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
     let uho_lichess_len = uho_lichess.len();
     let mut stream_out = BufWriter::new(std::io::stdout());
     //let mut stdout = std::io::stdout();
-    let mut stdout: termion::raw::RawTerminal<std::io::StdoutLock<'static>> =
-        std::io::stdout().lock().into_raw_mode().unwrap();
+    let mut stdout: termion::raw::RawTerminal<std::io::StdoutLock<'static>> = std::io::stdout().lock().into_raw_mode().unwrap();
     let mut stdin: std::io::Bytes<termion::AsyncReader> = async_stdin().bytes();
 
     let mut enm: ChessNet = net.clone();
