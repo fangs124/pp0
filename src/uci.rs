@@ -1,10 +1,14 @@
-use std::{io, time::Duration};
+use std::{
+    io,
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
+};
 
 use chessbb::TranspositionTable;
 
 use crate::{ChessGame, ChessNet};
 
-//const DEBUG: bool = false;
+const DEBUG: bool = false;
 //const foo: usize = size_of::<TranspositionTable>(); //16 bytes
 //const bar: usize = size_of::<Mutex<TranspositionTable>>(); //24 bytes
 impl ChessNet {
@@ -36,10 +40,7 @@ impl ChessNet {
                         tt = TranspositionTable::new();
                     }
                     "go" => {
-                        println!(
-                            "{}",
-                            uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self, &mut tt)
-                        )
+                        println!("{}", uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self, &mut tt))
                     }
                     "quit" => return Ok(()),
                     //TODO
@@ -71,7 +72,10 @@ fn uci_position(chess_game: &mut ChessGame, cmd_str: &str) {
                     //let fen = cmds.take(6).fold(String::new(), |a, b| a + " " + b);
                     //println!("fen: {}", fen);
                     *chess_game = ChessGame::from_fen(&fen);
-                    //eprintln!("board:\n\r{}", chess_game.cb);
+
+                    if DEBUG {
+                        eprintln!("board:\n\r{}", chess_game.cb);
+                    }
                     //println!("cmds: {:?}", cmds.clone().collect::<Vec<&str>>());
                     // rnb1kbnr/ppp1pppp/8/4q3/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 0 1
                 }
@@ -86,7 +90,7 @@ fn uci_position(chess_game: &mut ChessGame, cmd_str: &str) {
             //position fen r1b1kbnr/ppp2ppp/3p1q2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 0 1 moves e1g1 f6f2 d4f2 g8h6 f2e1
             //eprintln!("cmd: {:?}", cmd);
             chess_game.make_move(cmd);
-            eprintln!("board:\n\r{}", chess_game.cb);
+            //eprintln!("board:\n\r{}", chess_game.cb);
             //for chess_move in chess_game.try_generate_moves().0 {
             //    if chess_move.print_move() == cmd {
             //        //todo: maybe parse into a source/target and do int compare
@@ -128,8 +132,11 @@ pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt:
     //    binc.as_millis()
     //);
     //search_position(depth)
-    return format!("bestmove {}", net.iterative_deepening_no_tt(chess_game, depth, time_left).print_move());
+    let (d, node_count, eval, duration, best_move) = net.iterative_deepening_no_tt(chess_game, depth, time_left);
+    let nps = (node_count as f64 / duration.as_secs_f64()) as usize;
+    println!("info score cp {eval} depth {d} nodes {} nps {nps} time {}, ", node_count, duration.as_millis());
+    return format!("bestmove {}", best_move.print_move());
 }
 
-const BASE_COEFF: u32 = 20;
+const BASE_COEFF: u32 = 10;
 const INCREMENT_COEFF: u32 = 2;

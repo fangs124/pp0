@@ -121,18 +121,21 @@ impl ChessNet {
         return best_move;
     }
 
-    pub fn iterative_deepening_no_tt(&mut self, cg: &mut ChessGame, max_depth: Option<usize>, time_limit: Duration) -> ChessMove {
+    pub fn iterative_deepening_no_tt(
+        &mut self, cg: &mut ChessGame, max_depth: Option<usize>, time_limit: Duration,
+    ) -> (usize, usize, i16, Duration, ChessMove) {
         let now = Instant::now();
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
         assert!(!moves.is_empty());
         let mut best_move = moves[0].clone();
-        let (tx, rx) = mpsc::channel::<ChessMove>();
+        let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize)>();
         let max_depth = match max_depth {
             Some(x) => x,
             None => usize::MAX,
         };
-        let mut d = 1;
-        let mut node_count: usize = 0;
+        let mut d: usize = 1;
+        let mut node_count_total: usize = 0;
+        let mut eval: i16 = 0;
         while now.elapsed() < time_limit && d <= max_depth {
             if SEARCH_INSTANCE_COUNT.load(Ordering::SeqCst) <= MAX_SEARCH_INSTANCE {
                 SEARCH_INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -143,18 +146,21 @@ impl ChessNet {
                 rayon::spawn(move || {
                     let mut tt_new = TranspositionTable::new();
                     let mut node_count: usize = 0;
-                    _ = tx_new.send(net.find_move(&mut cg_new, d, &mut node_count, moves_new, &mut tt_new));
+                    let (eval, chess_move) = cg_new.negamax(d, &mut net, &mut tt_new, &mut node_count, Some((moves_new, GameState::Ongoing)));
+                    _ = tx_new.send((chess_move.unwrap(), eval, node_count));
                     SEARCH_INSTANCE_COUNT.fetch_sub(1_usize, Ordering::SeqCst);
                 });
             }
 
-            while let Ok(data) = rx.try_recv() {
-                best_move = data;
+            while let Ok((chess_move_data, eval_data, node_count_data)) = rx.try_recv() {
+                best_move = chess_move_data;
+                eval = eval_data;
+                node_count_total += node_count_data;
                 d += 1;
             }
         }
 
-        return best_move;
+        return (d - 1, node_count_total, eval, now.elapsed(), best_move);
     }
 
     pub fn find_move(&mut self, cg: &mut ChessGame, d: usize, node_count: &mut usize, moves: Vec<ChessMove>, tt: &mut TranspositionTable) -> ChessMove {
@@ -200,36 +206,6 @@ impl ChessNet {
     pub fn update(&mut self, grad: Gradient, r: f32) {
         self.net.update(grad, r);
     }
-
-    //greedy
-    //pub fn get_move(&mut self, gb: &GameBoard) -> BitBoard {
-    //    self.net.forward_prop(gb);
-    //    let output = get_index(&self.pi(), gb);
-    //    return BitBoard::MOVES[output];
-    //}
-    //
-    ////epsilon-greedy
-    //pub fn get_move_eps(&mut self, gb: &GameBoard) -> BitBoard {
-    //    let is_play_random = random_bool(EPS);
-    //    if !is_play_random {
-    //        self.net.forward_prop(gb);
-    //        let output = get_index(&self.pi(), gb);
-    //        return BitBoard::MOVES[output];
-    //    }
-    //
-    //    let valid_moves: Vec<BitBoard> =
-    //        BitBoard::MOVES.to_vec().into_iter().filter(|bb| gb.is_valid_move(bb)).collect();
-    //    let i: usize = random_range(0..valid_moves.len());
-    //    return valid_moves[i];
-    //}
-    //
-    ////random
-    //pub fn get_move_rand(&mut self, gb: &GameBoard) -> BitBoard {
-    //    let valid_moves: Vec<BitBoard> =
-    //        BitBoard::MOVES.to_vec().into_iter().filter(|bb| gb.is_valid_move(bb)).collect();
-    //    let i: usize = random_range(0..valid_moves.len());
-    //    return valid_moves[i];
-    //}
 }
 
 #[inline(always)]
@@ -238,24 +214,6 @@ fn compute_scalar(index: usize, total: usize) -> f32 {
 }
 
 #[inline(always)]
-fn negate(pair: (i16, Option<ChessMove>)) -> (i16, Option<ChessMove>) {
-    return (-pair.0, pair.1);
-}
-
-//pub fn negamax_epsilon(
-//    &mut self,
-//    cg: &mut ChessGame,
-//    d: usize,
-//    moves: &Vec<ChessMove>,
-//    tt: &mut TranspositionTable,
-//) -> ChessMove {
-//    assert!(!moves.is_empty());
-//    if random_bool(EPSILON) {
-//        return moves[random_range(0..moves.len())];
-//    }
-//    return self.negamax(cg, d, moves, tt);
-//}
-
 fn get_move_rand(_: &mut ChessNet, _: &mut ChessGame, _: usize, moves: &Vec<ChessMove>, _: &mut TranspositionTable) -> ChessMove {
     moves[random_range(0..moves.len())]
 }

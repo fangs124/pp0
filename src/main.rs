@@ -28,7 +28,7 @@ type GR = GameResult;
 
 const NODE_COUNT: [usize; 3] = [128, 16, 1];
 const MAX_INSTANCE: usize = 24;
-const BATCH_SIZE: usize = 100000; //~4.8 Mil
+const BATCH_SIZE: usize = 10000; //~4.8 Mil
 const REVIEW_SIZE: usize = 10000;
 const UPDATE_PER_BATCH: usize = 2;
 
@@ -263,12 +263,9 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             }
 
             // review games finished
-            #[rustfmt::skip]
             write!(stdout, "{}{}{}{}", cursor::Goto(1, 8), clear::CurrentLine, cursor::Goto(1, 9), clear::CurrentLine)?;
-            #[rustfmt::skip]
-            write!(stdout, "{}{}{}{}", cursor::Goto(1,10), clear::CurrentLine, cursor::Goto(1,11), clear::CurrentLine)?;
-            #[rustfmt::skip]
-            write!(stdout, "{}{}{}{}", cursor::Goto(1,12), clear::CurrentLine, cursor::Goto(1,13), clear::CurrentLine)?;
+            write!(stdout, "{}{}{}{}", cursor::Goto(1, 10), clear::CurrentLine, cursor::Goto(1, 11), clear::CurrentLine)?;
+            write!(stdout, "{}{}{}{}", cursor::Goto(1, 12), clear::CurrentLine, cursor::Goto(1, 13), clear::CurrentLine)?;
 
             write!(stdout, "{}======= reviewing net v.{}! =======\n\r", cursor::Goto(1, 8), net.version)?;
             let new_win_rate: f32 = (r_scoreboard.wins as f32) / (review_match_count as f32);
@@ -279,7 +276,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             }
             #[rustfmt::skip]
             write!(stdout, "lose rate: {:.2}% (best: {:.2}%)", new_lose_rate * 100.0, best_lose_rate * 100.0, )?;
-            write!(stdout, ", best win rate: {:.2}\n\r", best_win_rate * 100.0)?;
+            write!(stdout, ", best win rate: {:.2}%\n\r", best_win_rate * 100.0)?;
 
             if new_lose_rate < best_lose_rate {
                 best_lose_rate = new_lose_rate;
