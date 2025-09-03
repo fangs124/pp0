@@ -3,7 +3,7 @@ use std::{sync::mpsc::Sender, time::Duration};
 use crate::{ChessGame, ChessNet, FALLBACK_DEPTH, STUNTED_FALLBACK_DEPTH};
 use chessbb::{ChessMove, GameResult, GameState, MATERIAL_EVAL, Side, TranspositionTable};
 use nnet::SparseVec;
-use rand::{random_bool, random_range};
+use rand::{random_bool, random_range, seq::SliceRandom};
 
 pub const EPS: f64 = 0.2;
 pub struct TrainingResult {
@@ -54,7 +54,11 @@ pub fn play(mut net: ChessNet, mut enm: Option<ChessNet>, tx: Sender<TR>, param:
     let (find_move_net, find_move_enm) = parse_param(enm.is_some(), param);
 
     // play game
-    while game_state == GameState::Ongoing {
+    let result = loop {
+        if let GameState::Finished(result) = game_state {
+            break result;
+        }
+
         let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
             true => find_move_net(&mut net, &mut chess_game, &mut node_count_net, &mut ins, &mut outs, moves, &mut tt_net),
             false => find_move_enm(&mut enm, &mut chess_game, &mut node_count_enm, moves, &mut tt_enm),
@@ -62,9 +66,8 @@ pub fn play(mut net: ChessNet, mut enm: Option<ChessNet>, tx: Sender<TR>, param:
 
         chess_game.update_state(chess_move);
         (moves, game_state) = chess_game.try_generate_moves();
-    }
+    };
 
-    let GameState::Finished(result) = game_state else { unreachable!() };
     let pairs: Vec<(SparseVec, i16)> = ins.into_iter().zip(outs).collect();
     let net_side: Side = match is_net_white {
         true => Side::White,
@@ -113,14 +116,16 @@ fn parse_param(enm_is_some: bool, param: &PlayParameter) -> (NetFindMove, EnmFin
             }
 
             (false, true) => {
-                |_enm: &mut Option<ChessNet>, chess_game: &mut ChessGame, node_count: &mut usize, moves: Vec<ChessMove>, tt_enm: &mut TranspositionTable| {
+                |_enm: &mut Option<ChessNet>, chess_game: &mut ChessGame, node_count: &mut usize, mut moves: Vec<ChessMove>, tt_enm: &mut TranspositionTable| {
+                    moves.shuffle(&mut rand::rng());
                     epsilon(EPS, moves, |moves| chess_game.find_move(STUNTED_FALLBACK_DEPTH, &mut MATERIAL_EVAL, node_count, moves, tt_enm))
                 }
             }
 
             (false, false) => {
-                |_enm: &mut Option<ChessNet>, chess_game: &mut ChessGame, node_count: &mut usize, moves: Vec<ChessMove>, tt_enm: &mut TranspositionTable| {
-                    chess_game.find_move(STUNTED_FALLBACK_DEPTH, &mut MATERIAL_EVAL, &mut 0, moves, tt_enm)
+                |_enm: &mut Option<ChessNet>, chess_game: &mut ChessGame, node_count: &mut usize, mut moves: Vec<ChessMove>, tt_enm: &mut TranspositionTable| {
+                    moves.shuffle(&mut rand::rng());
+                    chess_game.find_move(STUNTED_FALLBACK_DEPTH, &mut MATERIAL_EVAL, node_count, moves, tt_enm)
                 }
             }
         };

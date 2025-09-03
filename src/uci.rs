@@ -1,10 +1,13 @@
 use std::{
     io,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Duration,
 };
 
-use chessbb::TranspositionTable;
+use chessbb::{Side, TranspositionTable};
 
 use crate::{ChessGame, ChessNet};
 
@@ -15,8 +18,8 @@ impl ChessNet {
     pub fn uci_loop_start(&mut self) -> io::Result<()> {
         let mut chessgame = ChessGame::start_pos();
         let mut reader = io::BufReader::new(io::stdin());
-        let mut buffer = String::with_capacity(1 << 12);
-        let mut tt: TranspositionTable = TranspositionTable::new();
+        let mut buffer = String::with_capacity(1 << 8);
+        let mut tt: Arc<Mutex<TranspositionTable>> = Arc::new(Mutex::new(TranspositionTable::new()));
 
         while let Ok(count) = io::BufRead::read_line(&mut reader, &mut buffer) {
             if count == 0 {
@@ -37,10 +40,10 @@ impl ChessNet {
                     "position" => uci_position(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str()),
                     "ucinewgame" => {
                         chessgame = ChessGame::start_pos();
-                        tt = TranspositionTable::new();
+                        tt = Arc::new(Mutex::new(TranspositionTable::new()));
                     }
                     "go" => {
-                        println!("{}", uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self, &mut tt))
+                        println!("{}", uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self, tt.clone()))
                     }
                     "quit" => return Ok(()),
                     //TODO
@@ -58,7 +61,7 @@ fn uci_position(chess_game: &mut ChessGame, cmd_str: &str) {
     let mut cmds = cmd_str.split(' ');
     let mut is_parsing_moves = false;
     //println!("cmds: {:?}", cmds);
-    'a: while let Some(cmd) = cmds.next() {
+    while let Some(cmd) = cmds.next() {
         if !is_parsing_moves {
             match cmd {
                 "startpos" => *chess_game = ChessGame::start_pos(),
@@ -103,7 +106,7 @@ fn uci_position(chess_game: &mut ChessGame, cmd_str: &str) {
     }
 }
 
-pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt: &mut TranspositionTable) -> String {
+pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt: Arc<Mutex<TranspositionTable>>) -> String {
     let mut cmds = cmd_str.split(' ');
     let mut wtime: Duration = Duration::from_secs(1);
     let mut btime: Duration = Duration::from_secs(1);
@@ -121,8 +124,8 @@ pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt:
         }
     }
     let time_left: Duration = match chess_game.side() {
-        chessbb::Side::White => (wtime / BASE_COEFF) + (winc / INCREMENT_COEFF),
-        chessbb::Side::Black => (btime / BASE_COEFF) + (binc / INCREMENT_COEFF),
+        Side::White => (wtime / BASE_COEFF) + (winc / INCREMENT_COEFF),
+        Side::Black => (btime / BASE_COEFF) + (binc / INCREMENT_COEFF),
     };
     //eprintln!(
     //    "wtime: {}ms, winc: {}ms, btime: {}ms, binc:{}ms",
@@ -132,7 +135,8 @@ pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt:
     //    binc.as_millis()
     //);
     //search_position(depth)
-    let (d, node_count, eval, duration, best_move) = net.iterative_deepening_no_tt(chess_game, depth, time_left);
+
+    let (d, node_count, eval, duration, best_move) = net.iterative_deepening_no_tt(chess_game, depth, time_left, tt);
     let nps = (node_count as f64 / duration.as_secs_f64()) as usize;
     println!("info score cp {eval} depth {d} nodes {} nps {nps} time {}, ", node_count, duration.as_millis());
     return format!("bestmove {}", best_move.print_move());

@@ -9,10 +9,10 @@ use std::{
 
 use chessbb::{ChessBoard, ChessMove, Evaluator, GameResult, GameState, Side, TranspositionTable};
 use nalgebra::DVector;
-use rand::{random_bool, random_range};
+use rand::random_range;
 use serde::{Deserialize, Serialize};
 
-use crate::{ChessGame, IS_REG, LEARNING_RATE, nnet::*, simulation::TrainingResult};
+use crate::{ChessGame, LEARNING_RATE, nnet::*, simulation::TrainingResult};
 
 const MAX_SEARCH_INSTANCE: usize = 1;
 static SEARCH_INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0_usize);
@@ -25,7 +25,6 @@ pub struct ChessNet {
 }
 
 impl Evaluator for ChessNet {
-    //TODO fix this so that its not horridly expensive
     fn eval(&mut self, cb: &ChessBoard) -> i16 {
         self.net.forward_prop_sparse_vec(ChessGame::vectorize_sparse(cb));
         return (self.phi_z()[0] * 1000.0) as i16;
@@ -39,8 +38,6 @@ impl Evaluator for ChessNet {
 //        return (self.phi_z()[0] * 1000.0) as i16;
 //    }
 //}
-
-const EPSILON: f64 = 0.4;
 
 impl ChessNet {
     #[inline(always)]
@@ -122,10 +119,10 @@ impl ChessNet {
     }
 
     pub fn iterative_deepening_no_tt(
-        &mut self, cg: &mut ChessGame, max_depth: Option<usize>, time_limit: Duration,
+        &mut self, cg: &mut ChessGame, max_depth: Option<usize>, time_limit: Duration, tt: Arc<Mutex<TranspositionTable>>,
     ) -> (usize, usize, i16, Duration, ChessMove) {
-        let now = Instant::now();
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
+        SEARCH_INSTANCE_COUNT.store(0, Ordering::SeqCst);
         assert!(!moves.is_empty());
         let mut best_move = moves[0].clone();
         let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize)>();
@@ -136,6 +133,7 @@ impl ChessNet {
         let mut d: usize = 1;
         let mut node_count_total: usize = 0;
         let mut eval: i16 = 0;
+        let now = Instant::now();
         while now.elapsed() < time_limit && d <= max_depth {
             if SEARCH_INSTANCE_COUNT.load(Ordering::SeqCst) <= MAX_SEARCH_INSTANCE {
                 SEARCH_INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -143,7 +141,9 @@ impl ChessNet {
                 let tx_new = tx.clone();
                 let mut cg_new = cg.clone();
                 let moves_new = moves.clone();
+                //let tt_new = tt.clone();
                 rayon::spawn(move || {
+                    //let mut tt_new = tt_new.lock().unwrap();
                     let mut tt_new = TranspositionTable::new();
                     let mut node_count: usize = 0;
                     let (eval, chess_move) = cg_new.negamax(d, &mut net, &mut tt_new, &mut node_count, Some((moves_new, GameState::Ongoing)));
@@ -159,7 +159,7 @@ impl ChessNet {
                 d += 1;
             }
         }
-
+        SEARCH_INSTANCE_COUNT.store(0, Ordering::SeqCst);
         return (d - 1, node_count_total, eval, now.elapsed(), best_move);
     }
 
@@ -197,7 +197,7 @@ impl ChessNet {
             let lerp = (1.0 - t.powi(8)) * (eval.min(1000).max(-1000) as f32 / 1000.0) + t.powi(8) * reward;
             let target_output = DVector::from_element(1, lerp);
 
-            let grad = self.back_prop_sparse_vec(input, target_output, 1.0);
+            let grad = self.back_prop_sparse_vec(input, target_output, scaled_reward);
             self.update(grad, -LEARNING_RATE);
             ith_move += 1;
         }
@@ -210,7 +210,7 @@ impl ChessNet {
 
 #[inline(always)]
 fn compute_scalar(index: usize, total: usize) -> f32 {
-    0.75 + (0.25 * (((index) as f32) / (total as f32)))
+    0.4 + (0.6 * (((index) as f32) / (total as f32)))
 }
 
 #[inline(always)]

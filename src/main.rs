@@ -29,10 +29,10 @@ type GR = GameResult;
 const NODE_COUNT: [usize; 3] = [128, 16, 1];
 const MAX_INSTANCE: usize = 24;
 const BATCH_SIZE: usize = 10000; //~4.8 Mil
-const REVIEW_SIZE: usize = 10000;
+const REVIEW_SIZE: usize = 1000;
 const UPDATE_PER_BATCH: usize = 2;
 
-const LEARNING_RATE: f32 = 0.00001;
+const LEARNING_RATE: f32 = 0.0001;
 const FALLBACK_DEPTH: usize = 3;
 const STUNTED_FALLBACK_DEPTH: usize = 1;
 const IS_REG: bool = false;
@@ -51,7 +51,7 @@ enum State {
 
 const IS_ALT: bool = false;
 const START_STRONGER_THAN_RAND: bool = false;
-const FLIP: bool = true;
+const FLIP: bool = false;
 fn alt_main() -> std::io::Result<()> {
     let file = File::open(format!("{:?}net.json", NODE_COUNT))?;
     let mut buf_reader = BufReader::new(file);
