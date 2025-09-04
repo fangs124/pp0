@@ -86,7 +86,7 @@ impl ChessNet {
         self.net.phi_z()
     }
 
-    pub fn iterative_deepening(&mut self, cg: &mut ChessGame, max_depth: Option<usize>, tt: &mut TranspositionTable, time_limit: Duration) -> ChessMove {
+    pub fn iterative_deepening(&mut self, cg: &mut ChessGame, max_depth: Option<u16>, tt: &mut TranspositionTable, time_limit: Duration) -> ChessMove {
         let now = Instant::now();
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
         assert!(!moves.is_empty());
@@ -94,7 +94,7 @@ impl ChessNet {
         let (tx, rx) = mpsc::channel::<ChessMove>();
         let max_depth = match max_depth {
             Some(x) => x,
-            None => usize::MAX,
+            None => u16::MAX,
         };
         let mut d = 1;
         while now.elapsed() < time_limit && d <= max_depth {
@@ -129,7 +129,7 @@ impl ChessNet {
         let (tx, rx) = mpsc::channel::<ChessMove>();
         let max_depth = match max_depth {
             Some(x) => x,
-            None => usize::MAX,
+            None => u16::MAX,
         };
         let mut d = 1;
         let mut node_count: usize = 0;
@@ -157,12 +157,12 @@ impl ChessNet {
         return best_move;
     }
 
-    pub fn find_move(&mut self, cg: &mut ChessGame, d: usize, node_count: &mut usize, moves: Vec<ChessMove>, tt: &mut TranspositionTable) -> ChessMove {
+    pub fn find_move(&mut self, cg: &mut ChessGame, d: u16, node_count: &mut usize, moves: Vec<ChessMove>, tt: &mut TranspositionTable) -> ChessMove {
         return cg.find_move(d, self, node_count, moves, tt);
     }
 
     pub fn learn(
-        &mut self, cg: &mut ChessGame, d: usize, node_count: &mut usize, ins: &mut Vec<SparseVec>, outs: &mut Vec<i16>, moves: Vec<ChessMove>,
+        &mut self, cg: &mut ChessGame, d: u16, node_count: &mut usize, ins: &mut Vec<SparseVec>, outs: &mut Vec<i16>, moves: Vec<ChessMove>,
         tt: &mut TranspositionTable,
     ) -> ChessMove {
         ins.push(cg.to_sparse_vec());
