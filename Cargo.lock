@@ -427,6 +427,7 @@ dependencies = [
  "itertools",
  "nalgebra",
  "rand",
+ "rand_distr",
  "serde",
  "serde_json",
 ]
