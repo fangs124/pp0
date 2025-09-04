@@ -26,7 +26,7 @@ mod uci;
 
 type GR = GameResult;
 
-const NODE_COUNT: [usize; 3] = [128, 16, 1];
+const NODE_COUNT: [usize; 3] = [256, 128, 1];
 const MAX_INSTANCE: usize = 24;
 const BATCH_SIZE: usize = 10000; //~4.8 Mil
 const REVIEW_SIZE: usize = 1000;
@@ -49,7 +49,7 @@ enum State {
     Quit,
 }
 
-const IS_ALT: bool = false;
+const IS_ALT: bool = true;
 const START_STRONGER_THAN_RAND: bool = false;
 const FLIP: bool = false;
 fn alt_main() -> std::io::Result<()> {
