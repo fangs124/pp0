@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write, stdout};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -63,6 +64,7 @@ fn alt_main() -> std::io::Result<()> {
 }
 //fn main() -> std::io::Result<()> {}
 fn main() -> std::io::Result<()> {
+    let foo = rayon::ThreadPoolBuilder::new().thread_name(|x: usize| format!("Thread:{x}")).build_global().unwrap();
     //unsafe { backtrace_on_stack_overflow::enable() }
     unsafe { std::env::set_var("RUST_BACKTRACE", "1") };
     if IS_ALT {
