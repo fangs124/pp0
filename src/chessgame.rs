@@ -1,7 +1,11 @@
-use chessbb::{ChessBoard, ChessMove, ChessPiece, Evaluator, GameState, PieceType, Side, Square, TranspositionTable};
+use std::sync::Arc;
+
+use chessbb::{ChessBoard, ChessMove, ChessPiece, Evaluator, GameState, NegamaxData, PieceType, Side, Square, TranspositionTable};
 use nalgebra::DVector;
 use nnet::{InputType, SparseInputType, SparseVec};
 use rand::random_range;
+
+use crate::AtomicTT;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChessGame {
@@ -52,17 +56,19 @@ impl ChessGame {
     }
 
     #[inline(always)]
-    pub fn negamax(
-        &mut self, d: usize, ev: &mut impl Evaluator, tt: &mut TranspositionTable, node_count: &mut usize, pair: Option<(Vec<ChessMove>, GameState)>,
-    ) -> (i16, Option<ChessMove>) {
-        self.cb.negamax(i16::MIN + 1, i16::MAX - 1, d, 0, ev, tt, node_count, pair).unwrap()
+    pub fn negamax(&mut self, d: usize, ev: &mut impl Evaluator, data: &mut NegamaxData, tt: Arc<AtomicTT>) -> (i16, Option<ChessMove>) {
+        self.cb.negamax(i16::MIN + 1, i16::MAX - 1, d, ev, data, tt).unwrap()
     }
 
     #[inline(always)]
-    pub fn find_move(&mut self, d: usize, ev: &mut impl Evaluator, node_count: &mut usize, moves: Vec<ChessMove>, tt: &mut TranspositionTable) -> ChessMove {
+    pub fn find_move(&mut self, d: usize, ev: &mut impl Evaluator, node_count: &mut usize, moves: Vec<ChessMove>, tt: Arc<AtomicTT>) -> ChessMove {
         assert!(moves.len() > 0);
+        //TODO: fix this ugly thing
         let chess_move: ChessMove = moves[0].clone();
-        return self.negamax(d, ev, tt, node_count, Some((moves, GameState::Ongoing))).1.unwrap_or(chess_move);
+        let mut data: NegamaxData = NegamaxData::new(Some((moves, GameState::Ongoing)));
+        let chess_move = self.negamax(d, ev, &mut data, tt).1.unwrap_or(chess_move);
+        *node_count = data.node_count();
+        return chess_move;
     }
 
     #[inline(always)]
@@ -160,9 +166,4 @@ impl ChessGame {
         }
         return output;
     }
-}
-
-#[inline(always)]
-fn negate(pair: (i16, Option<ChessMove>)) -> (i16, Option<ChessMove>) {
-    return (-pair.0, pair.1);
 }

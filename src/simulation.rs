@@ -1,11 +1,15 @@
-use std::{sync::mpsc::Sender, time::Duration};
+use std::{
+    sync::{Arc, mpsc::Sender},
+    time::{Duration, Instant},
+};
 
-use crate::{ChessGame, ChessNet, FALLBACK_DEPTH, STUNTED_FALLBACK_DEPTH};
-use chessbb::{ChessMove, GameResult, GameState, MATERIAL_EVAL, Side, TranspositionTable};
+use crate::{AtomicTT, BASE_COEFF, BASE_TIME, ChessGame, ChessNet, FALLBACK_DEPTH, INCREMENT_COEFF, INCREMENT_TIME, STUNTED_FALLBACK_DEPTH};
+use chessbb::{AtomicTranspositionTable, ChessMove, GameResult, GameState, MATERIAL_EVAL, Side, TranspositionTable};
 use nnet::SparseVec;
 use rand::{random_bool, random_range, seq::SliceRandom};
 
-pub const EPS: f64 = 0.2;
+pub const EPS: f64 = 0.1;
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrainingResult {
     pub epoch: usize,
     pub result: GameResult,
@@ -17,6 +21,7 @@ pub struct TrainingResult {
 
 type TR = TrainingResult;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlayParameter {
     epoch: usize,
     is_learn: bool,
@@ -31,9 +36,22 @@ impl PlayParameter {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TimeControl {
     base: Duration,
     increment: Duration,
+}
+
+impl TimeControl {
+    pub const fn new(base: Duration, increment: Duration) -> TimeControl {
+        TimeControl { base, increment }
+    }
+}
+
+impl Default for TimeControl {
+    fn default() -> Self {
+        Self { base: BASE_TIME, increment: INCREMENT_TIME }
+    }
 }
 
 pub fn play(mut net: ChessNet, mut enm: Option<ChessNet>, tx: Sender<TR>, param: &PlayParameter) {
@@ -47,22 +65,49 @@ pub fn play(mut net: ChessNet, mut enm: Option<ChessNet>, tx: Sender<TR>, param:
 
     let mut ins: Vec<SparseVec> = Vec::new();
     let mut outs: Vec<i16> = Vec::new();
-    let mut tt_net: TranspositionTable = TranspositionTable::new();
-    let mut tt_enm: TranspositionTable = TranspositionTable::new();
+    let tt_net: Arc<AtomicTT> = Arc::new(AtomicTranspositionTable::new());
+    let tt_enm: Arc<AtomicTT> = Arc::new(AtomicTranspositionTable::new());
     let mut node_count_net: usize = 0;
     let mut node_count_enm: usize = 0;
     let (find_move_net, find_move_enm) = parse_param(enm.is_some(), param);
+
+    let mut white_tc: Option<Duration> = match &param.tc {
+        Some(tc) => Some(tc.base),
+        None => None,
+    };
+
+    let mut black_tc: Option<Duration> = match &param.tc {
+        Some(tc) => Some(tc.base),
+        None => None,
+    };
 
     // play game
     let result = loop {
         if let GameState::Finished(result) = game_state {
             break result;
         }
+        let side = chess_game.side();
 
-        let chess_move: ChessMove = match is_net_white == (chess_game.side() == Side::White) {
-            true => find_move_net(&mut net, &mut chess_game, &mut node_count_net, &mut ins, &mut outs, moves, &mut tt_net),
-            false => find_move_enm(&mut enm, &mut chess_game, &mut node_count_enm, moves, &mut tt_enm),
+        let time_limit: Option<Duration> = match &param.tc {
+            None => None,
+            Some(tc) => match side {
+                Side::White => Some((white_tc.unwrap() / BASE_COEFF) + (tc.increment / INCREMENT_COEFF)),
+                Side::Black => Some((black_tc.unwrap() / BASE_COEFF) + (tc.increment / INCREMENT_COEFF)),
+            },
         };
+
+        let now = Instant::now();
+        let chess_move: ChessMove = match is_net_white == (side == Side::White) {
+            true => find_move_net(&mut net, &mut chess_game, &mut node_count_net, &mut ins, &mut outs, moves, tt_net.clone(), time_limit),
+            false => find_move_enm(&mut enm, &mut chess_game, &mut node_count_enm, moves, tt_enm.clone(), time_limit),
+        };
+
+        if let Some(tc) = &param.tc {
+            match side {
+                Side::White => white_tc = Some((white_tc.unwrap() + tc.increment).checked_sub(now.elapsed()).unwrap_or(Duration::ZERO)),
+                Side::Black => black_tc = Some((black_tc.unwrap() + tc.increment).checked_sub(now.elapsed()).unwrap_or(Duration::ZERO)),
+            }
+        }
 
         chess_game.update_state(chess_move);
         (moves, game_state) = chess_game.try_generate_moves();
@@ -79,55 +124,73 @@ pub fn play(mut net: ChessNet, mut enm: Option<ChessNet>, tx: Sender<TR>, param:
 }
 
 type NetFindMove =
-    fn(&mut ChessNet, &mut ChessGame, node_count: &mut usize, &mut Vec<SparseVec>, &mut Vec<i16>, Vec<ChessMove>, &mut TranspositionTable) -> ChessMove;
+    fn(&mut ChessNet, &mut ChessGame, node_count: &mut usize, &mut Vec<SparseVec>, &mut Vec<i16>, Vec<ChessMove>, Arc<AtomicTT>, Option<Duration>) -> ChessMove;
 
-type EnmFindMove = fn(&mut Option<ChessNet>, &mut ChessGame, node_count: &mut usize, Vec<ChessMove>, &mut TranspositionTable) -> ChessMove;
+type EnmFindMove = fn(&mut Option<ChessNet>, &mut ChessGame, node_count: &mut usize, Vec<ChessMove>, Arc<AtomicTT>, Option<Duration>) -> ChessMove;
 
 fn parse_param(enm_is_some: bool, param: &PlayParameter) -> (NetFindMove, EnmFindMove) {
-    let find_move_net: fn(&mut ChessNet, &mut ChessGame, &mut usize, &mut Vec<SparseVec>, &mut Vec<i16>, Vec<ChessMove>, &mut TranspositionTable) -> ChessMove =
-        match param.is_learn {
-            true => |net: &mut ChessNet,
-                     chess_game: &mut ChessGame,
-                     node_count: &mut usize,
-                     ins: &mut Vec<SparseVec>,
-                     outs: &mut Vec<i16>,
-                     moves: Vec<ChessMove>,
-                     tt_net: &mut TranspositionTable| {
-                return net.learn(chess_game, FALLBACK_DEPTH, node_count, ins, outs, moves, tt_net);
-            },
+    let find_move_net: fn(
+        &mut ChessNet,
+        &mut ChessGame,
+        &mut usize,
+        &mut Vec<SparseVec>,
+        &mut Vec<i16>,
+        Vec<ChessMove>,
+        Arc<AtomicTT>,
+        Option<Duration>,
+    ) -> ChessMove = match param.is_learn {
+        true => |net: &mut ChessNet,
+                 chess_game: &mut ChessGame,
+                 node_count: &mut usize,
+                 ins: &mut Vec<SparseVec>,
+                 outs: &mut Vec<i16>,
+                 moves: Vec<ChessMove>,
+                 tt_net: Arc<AtomicTT>,
+                 time_limit: Option<Duration>| {
+            return net.learn(chess_game, FALLBACK_DEPTH, node_count, ins, outs, moves, tt_net, time_limit);
+        },
+        false => |net: &mut ChessNet,
+                  chess_game: &mut ChessGame,
+                  node_count: &mut usize,
+                  _ins: &mut Vec<SparseVec>,
+                  _outs: &mut Vec<i16>,
+                  moves: Vec<ChessMove>,
+                  tt_net: Arc<AtomicTT>,
+                  time_limit: Option<Duration>| {
+            return net.find_move(chess_game, FALLBACK_DEPTH, node_count, moves, tt_net, time_limit);
+        },
+    };
 
-            false => |net: &mut ChessNet,
-                      chess_game: &mut ChessGame,
-                      node_count: &mut usize,
-                      _ins: &mut Vec<SparseVec>,
-                      _outs: &mut Vec<i16>,
-                      moves: Vec<ChessMove>,
-                      tt_net: &mut TranspositionTable| {
-                return net.find_move(chess_game, FALLBACK_DEPTH, node_count, moves, tt_net);
-            },
-        };
-
-    let find_move_enm: fn(&mut Option<ChessNet>, &mut ChessGame, &mut usize, Vec<ChessMove>, &mut TranspositionTable) -> ChessMove =
+    let find_move_enm: fn(&mut Option<ChessNet>, &mut ChessGame, &mut usize, Vec<ChessMove>, Arc<AtomicTT>, Option<Duration>) -> ChessMove =
         match (enm_is_some, param.is_learn) {
-            (true, _) => {
-                |enm: &mut Option<ChessNet>, chess_game: &mut ChessGame, node_count: &mut usize, moves: Vec<ChessMove>, tt_enm: &mut TranspositionTable| {
-                    epsilon(EPS, moves, |moves| ChessNet::find_move(enm.as_mut().unwrap(), chess_game, STUNTED_FALLBACK_DEPTH, node_count, moves, tt_enm))
-                }
-            }
+            (true, _) => |enm: &mut Option<ChessNet>,
+                          chess_game: &mut ChessGame,
+                          node_count: &mut usize,
+                          moves: Vec<ChessMove>,
+                          tt_enm: Arc<AtomicTT>,
+                          time_limit: Option<Duration>| {
+                epsilon(EPS, moves, |moves| enm.as_mut().unwrap().find_move(chess_game, STUNTED_FALLBACK_DEPTH, node_count, moves, tt_enm, time_limit))
+            },
 
-            (false, true) => {
-                |_enm: &mut Option<ChessNet>, chess_game: &mut ChessGame, node_count: &mut usize, mut moves: Vec<ChessMove>, tt_enm: &mut TranspositionTable| {
-                    moves.shuffle(&mut rand::rng());
-                    epsilon(EPS, moves, |moves| chess_game.find_move(STUNTED_FALLBACK_DEPTH, &mut MATERIAL_EVAL, node_count, moves, tt_enm))
-                }
-            }
+            (false, true) => |_enm: &mut Option<ChessNet>,
+                              chess_game: &mut ChessGame,
+                              node_count: &mut usize,
+                              mut moves: Vec<ChessMove>,
+                              tt_enm: Arc<AtomicTT>,
+                              _time_limit: Option<Duration>| {
+                moves.shuffle(&mut rand::rng());
+                epsilon(EPS, moves, |moves| chess_game.find_move(STUNTED_FALLBACK_DEPTH, &mut MATERIAL_EVAL, node_count, moves, tt_enm))
+            },
 
-            (false, false) => {
-                |_enm: &mut Option<ChessNet>, chess_game: &mut ChessGame, node_count: &mut usize, mut moves: Vec<ChessMove>, tt_enm: &mut TranspositionTable| {
-                    moves.shuffle(&mut rand::rng());
-                    chess_game.find_move(STUNTED_FALLBACK_DEPTH, &mut MATERIAL_EVAL, node_count, moves, tt_enm)
-                }
-            }
+            (false, false) => |_enm: &mut Option<ChessNet>,
+                               chess_game: &mut ChessGame,
+                               node_count: &mut usize,
+                               mut moves: Vec<ChessMove>,
+                               tt_enm: Arc<AtomicTT>,
+                               _time_limit: Option<Duration>| {
+                moves.shuffle(&mut rand::rng());
+                chess_game.find_move(STUNTED_FALLBACK_DEPTH, &mut MATERIAL_EVAL, node_count, moves, tt_enm)
+            },
         };
     return (find_move_net, find_move_enm);
 }
