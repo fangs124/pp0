@@ -56,12 +56,12 @@ impl ChessGame {
     }
 
     #[inline(always)]
-    pub fn negamax(&mut self, d: u16, ev: &mut impl Evaluator, data: &mut NegamaxData, tt: Arc<AtomicTT>) -> (i16, Option<ChessMove>) {
+    pub fn negamax(&mut self, d: usize, ev: &mut impl Evaluator, data: &mut NegamaxData, tt: Arc<AtomicTT>) -> (i16, Option<ChessMove>) {
         self.cb.negamax(i16::MIN + 1, i16::MAX - 1, d, ev, data, tt).unwrap()
     }
 
     #[inline(always)]
-    pub fn find_move(&mut self, d: u16, ev: &mut impl Evaluator, node_count: &mut usize, moves: Vec<ChessMove>, tt: Arc<AtomicTT>) -> ChessMove {
+    pub fn find_move(&mut self, d: usize, ev: &mut impl Evaluator, node_count: &mut usize, moves: Vec<ChessMove>, tt: Arc<AtomicTT>) -> ChessMove {
         assert!(moves.len() > 0);
         //TODO: fix this ugly thing
         let chess_move: ChessMove = moves[0].clone();

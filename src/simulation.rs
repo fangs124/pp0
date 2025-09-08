@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{AtomicTT, BASE_COEFF, BASE_TIME, ChessGame, ChessNet, FALLBACK_DEPTH, INCREMENT_COEFF, INCREMENT_TIME, STUNTED_FALLBACK_DEPTH};
-use chessbb::{AtomicTranspositionTable, ChessMove, GameResult, GameState, MATERIAL_EVAL, Side};
+use chessbb::{AtomicTranspositionTable, ChessMove, GameResult, GameState, MATERIAL_EVAL, Side, TranspositionTable};
 use nnet::SparseVec;
 use rand::{random_bool, random_range, seq::SliceRandom};
 

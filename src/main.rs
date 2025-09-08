@@ -36,8 +36,8 @@ const REVIEW_SIZE: usize = 1000;
 const UPDATE_PER_BATCH: usize = 2;
 
 const LEARNING_RATE: f32 = 0.00001;
-const FALLBACK_DEPTH: u16 = 3;
-const STUNTED_FALLBACK_DEPTH: u16 = 3;
+const FALLBACK_DEPTH: usize = 3;
+const STUNTED_FALLBACK_DEPTH: usize = 3;
 const IS_REG: bool = false;
 
 const BASE_TIME: Duration = Duration::from_secs(5);
@@ -60,7 +60,7 @@ enum State {
 }
 const IS_SINGLE_THREADED_MAIN: bool = false;
 const IS_MULTITHREADED_SEARCH: bool = false;
-const IS_ALT: bool = true;
+const IS_ALT: bool = false;
 const START_STRONGER_THAN_RAND: bool = false;
 const FLIP: bool = false;
 
@@ -188,8 +188,8 @@ fn train_st(net: &mut ChessNet) -> std::io::Result<()> {
     let mut enm: ChessNet = net.clone();
 
     //TODO
-    let mut scoreboard: ScoreBoard = ScoreBoard::new(net, &enm);
-    let mut r_scoreboard: ScoreBoard = ScoreBoard::new(net, &enm);
+    let mut scoreboard: ScoreBoard = ScoreBoard::new(net.version, enm.version);
+    let mut r_scoreboard: ScoreBoard = ScoreBoard::new(net.version, enm.version);
     let (tx, rx) = mpsc::channel::<TrainingResult>();
 
     write!(stdout, "{}", clear::All)?;
@@ -359,8 +359,10 @@ fn train_st(net: &mut ChessNet) -> std::io::Result<()> {
             f_buff.flush()?;
             r_scoreboard.update();
 
-            r_scoreboard.update_players(net, &enm);
-            scoreboard.update_players(net, &enm);
+            r_scoreboard.net1_ver = net.version;
+            scoreboard.net1_ver = net.version;
+            scoreboard.net2_ver = enm.version;
+
             return Ok(());
         }
 
@@ -413,8 +415,8 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
     let mut enm: ChessNet = net.clone();
 
     //TODO
-    let mut scoreboard: ScoreBoard = ScoreBoard::new(net, &enm);
-    let mut r_scoreboard: ScoreBoard = ScoreBoard::new(net, &enm);
+    let mut scoreboard: ScoreBoard = ScoreBoard::new(net.version, enm.version);
+    let mut r_scoreboard: ScoreBoard = ScoreBoard::new(net.version, enm.version);
     let (tx, rx) = mpsc::channel::<TrainingResult>();
 
     write!(stdout, "{}", clear::All)?;
@@ -592,8 +594,9 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
             f_buff.flush()?;
             r_scoreboard.update();
 
-            r_scoreboard.update_players(net, &enm);
-            r_scoreboard.update_players(net, &enm);
+            r_scoreboard.net1_ver = net.version;
+            scoreboard.net1_ver = net.version;
+            scoreboard.net2_ver = enm.version;
 
             let enm_file = File::create(format!("{:?}value_enm.json", NODE_COUNT))?;
             serde_json::to_writer(enm_file, &enm)?;

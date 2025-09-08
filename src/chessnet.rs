@@ -89,18 +89,18 @@ impl ChessNet {
         self.net.phi_z()
     }
 
-    pub fn iterative_deepening(&mut self, cg: &mut ChessGame, max_depth: Option<u16>, tt: Arc<AtomicTT>, time_limit: Duration) -> (i16, Option<ChessMove>) {
+    pub fn iterative_deepening(&mut self, cg: &mut ChessGame, max_depth: Option<usize>, tt: Arc<AtomicTT>, time_limit: Duration) -> (i16, Option<ChessMove>) {
         let now = Instant::now();
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
         assert!(!moves.is_empty());
         let mut best_eval = 0;
         let mut best_move: Option<_> = None;
-        let max_depth: u16 = match max_depth {
+        let max_depth = match max_depth {
             Some(x) => x,
-            None => u16::MAX,
+            None => usize::MAX,
         };
 
-        let mut d: u16 = 1;
+        let mut d = 1;
         while now.elapsed() < time_limit && d <= max_depth {
             let mut data: NegamaxData = NegamaxData::new_timed(Some((moves.clone(), GameState::Ongoing)), now, time_limit);
             (best_eval, best_move) = cg.negamax(d, self, &mut data, tt.clone());
@@ -111,7 +111,7 @@ impl ChessNet {
         return (best_eval, best_move);
     }
 
-    pub fn iterative_deepening_uci(&mut self, cg: &mut ChessGame, max_depth: Option<u16>, time_limit: Duration, tt: Arc<AtomicTT>) -> ChessMove {
+    pub fn iterative_deepening_uci(&mut self, cg: &mut ChessGame, max_depth: Option<usize>, time_limit: Duration, tt: Arc<AtomicTT>) -> ChessMove {
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
         SEARCH_INSTANCE_COUNT.store(0, Ordering::SeqCst);
         assert!(!moves.is_empty());
@@ -119,9 +119,9 @@ impl ChessNet {
         let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize)>();
         let max_depth = match max_depth {
             Some(x) => x,
-            None => u16::MAX,
+            None => usize::MAX,
         };
-        let mut d: u16 = 1;
+        let mut d: usize = 1;
         let mut node_count_total: usize = 0;
         let now = Instant::now();
         let mut duration = now.elapsed();
@@ -158,25 +158,23 @@ impl ChessNet {
     }
 
     //this doesn't seems to work, when in a tournamet with cutechess-gui engine disconnects constantly eventually
-    pub fn iterative_deepening_uci_experimental(
-        &mut self, cg: &mut ChessGame, max_depth: Option<u16>, time_limit: Duration, tt: Arc<AtomicTT>, now: Instant,
-    ) -> ChessMove {
+    pub fn iterative_deepening_uci_experimental(&mut self, cg: &mut ChessGame, max_depth: Option<usize>, time_limit: Duration, tt: Arc<AtomicTT>) -> ChessMove {
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
         assert!(!moves.is_empty());
         let mut best_move = moves[0].clone();
-        let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize, u16)>();
-        let max_depth: u16 = match max_depth {
+        let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize, usize)>();
+        let max_depth = match max_depth {
             Some(x) => x,
-            None => u16::MAX,
+            None => usize::MAX,
         };
-
+        let now = Instant::now();
         let tt_new = tt.clone();
         let mut cg = cg.clone();
         let mut net = self.clone();
         let mut node_count: usize = 0;
         rayon::spawn(move || {
             let moves = moves;
-            let mut depth: u16 = 1;
+            let mut depth: usize = 1;
             loop {
                 let mut data: NegamaxData = NegamaxData::new(Some((moves.clone(), GameState::Ongoing)));
                 //idk why this is a problem
@@ -190,7 +188,7 @@ impl ChessNet {
             //
         });
 
-        let mut d: u16 = 0;
+        let mut d = 0;
         while now.elapsed() < time_limit && d <= max_depth {
             if let Ok((chess_move_data, eval_data, node_count_data, d_data)) = rx.try_recv() {
                 d = d_data;
@@ -204,21 +202,20 @@ impl ChessNet {
         return best_move;
     }
 
-    pub fn iterative_deepening_uci_st(
-        &mut self, cg: &mut ChessGame, max_depth: Option<u16>, time_limit: Duration, tt: Arc<AtomicTT>, now: Instant,
-    ) -> ChessMove {
+    pub fn iterative_deepening_uci_st(&mut self, cg: &mut ChessGame, max_depth: Option<usize>, time_limit: Duration, tt: Arc<AtomicTT>) -> ChessMove {
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
         SEARCH_INSTANCE_COUNT.store(0, Ordering::SeqCst);
         assert!(!moves.is_empty());
         let mut best_move = moves[0].clone();
         let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize)>();
-        let max_depth: u16 = match max_depth {
+        let max_depth = match max_depth {
             Some(x) => x,
-            None => u16::MAX,
+            None => usize::MAX,
         };
-        let mut d: u16 = 1;
+        let mut d: usize = 1;
         let mut node_count_total: usize = 0;
         let mut eval: i16 = 0;
+        let now = Instant::now();
         while now.elapsed() < time_limit && d <= max_depth {
             if SEARCH_INSTANCE_COUNT.load(Ordering::SeqCst) <= 1 {
                 SEARCH_INSTANCE_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -244,18 +241,17 @@ impl ChessNet {
         return best_move;
     }
 
-    pub fn iterative_deepening_uci_mt(
-        &mut self, cg: &mut ChessGame, max_depth: Option<u16>, time_limit: Duration, tt: Arc<AtomicTT>, now: Instant,
-    ) -> ChessMove {
+    pub fn iterative_deepening_uci_mt(&mut self, cg: &mut ChessGame, max_depth: Option<usize>, time_limit: Duration, tt: Arc<AtomicTT>) -> ChessMove {
         let moves: Vec<ChessMove> = cg.cb.try_generate_moves().0;
         assert!(!moves.is_empty());
         let mut best_move: ChessMove = moves[0].clone();
-        let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize, u16)>();
-        let max_depth: u16 = match max_depth {
+        let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize, usize)>();
+        let max_depth = match max_depth {
             Some(x) => x,
-            None => u16::MAX,
+            None => usize::MAX,
         };
 
+        let now = Instant::now();
         for _i in 0..MAX_SEARCH_INSTANCE {
             let moves_new = moves.clone();
             let mut net_new = self.clone();
@@ -263,7 +259,7 @@ impl ChessNet {
             let tt = tt.clone();
             let tx = tx.clone();
             rayon::spawn(move || {
-                let mut depth: u16 = 1;
+                let mut depth: usize = 1;
                 loop {
                     let mut data: NegamaxData = NegamaxData::new(Some((moves_new.clone(), GameState::Ongoing)));
                     //idk why this is a problem
@@ -277,7 +273,7 @@ impl ChessNet {
                 //
             });
         }
-        let mut best_d: u16 = 1;
+        let mut best_d: usize = 1;
         let mut data: SearchInfo = SearchInfo::new();
         while now.elapsed() < time_limit && best_d <= max_depth {
             if let Ok((best_move_data, eval_data, node_count_data, d_data)) = rx.try_recv() {
@@ -308,7 +304,7 @@ impl ChessNet {
     }
 
     pub fn find_move(
-        &mut self, cg: &mut ChessGame, d: u16, node_count: &mut usize, moves: Vec<ChessMove>, tt: Arc<AtomicTT>, time_limit: Option<Duration>,
+        &mut self, cg: &mut ChessGame, d: usize, node_count: &mut usize, moves: Vec<ChessMove>, tt: Arc<AtomicTT>, time_limit: Option<Duration>,
     ) -> ChessMove {
         return match time_limit {
             Some(time_limit) => self.iterative_deepening(cg, None, tt, time_limit).1.unwrap(),
@@ -317,8 +313,8 @@ impl ChessNet {
     }
 
     pub fn learn(
-        &mut self, cg: &mut ChessGame, d: u16, node_count: &mut usize, ins: &mut Vec<SparseVec>, outs: &mut Vec<i16>, moves: Vec<ChessMove>, tt: Arc<AtomicTT>,
-        time_limit: Option<Duration>,
+        &mut self, cg: &mut ChessGame, d: usize, node_count: &mut usize, ins: &mut Vec<SparseVec>, outs: &mut Vec<i16>, moves: Vec<ChessMove>,
+        tt: Arc<AtomicTT>, time_limit: Option<Duration>,
     ) -> ChessMove {
         ins.push(cg.to_sparse_vec());
         assert!(!moves.is_empty() && d > 0);
