@@ -3,11 +3,31 @@ use std::{
     time::Instant,
 };
 
+use chessbb::MaterialEvaluator;
+
+use crate::ChessNet;
+
 use super::BATCH_SIZE;
 
+pub trait Player {
+    fn identifier(&self) -> String;
+}
+
+impl Player for ChessNet {
+    fn identifier(&self) -> String {
+        format!("net ver.{}", self.version)
+    }
+}
+
+impl Player for MaterialEvaluator {
+    fn identifier(&self) -> String {
+        format!("material eval")
+    }
+}
+
 pub struct ScoreBoard {
-    pub net1_ver: u32,
-    pub net2_ver: u32,
+    pub player1: String,
+    pub player2: String,
     pub wins: u32,
     pub draws: u32,
     pub losses: u32,
@@ -22,10 +42,10 @@ pub struct ScoreBoard {
 }
 
 impl ScoreBoard {
-    pub fn new(net1_ver: u32, net2_ver: u32) -> Self {
+    pub fn new(player1: &impl Player, player2: &impl Player) -> Self {
         ScoreBoard {
-            net1_ver,
-            net2_ver,
+            player1: player1.identifier(),
+            player2: player2.identifier(),
             wins: 0,
             draws: 0,
             losses: 0,
@@ -37,7 +57,10 @@ impl ScoreBoard {
             now: Instant::now(),
         }
     }
-
+    pub fn update_players(&mut self, player1: &impl Player, player2: &impl Player) {
+        self.player1 = player1.identifier();
+        self.player2 = player2.identifier();
+    }
     pub fn now(&mut self) {
         self.now = Instant::now();
     }
@@ -61,7 +84,7 @@ impl ScoreBoard {
 
     pub fn write_to_buf<T: Write>(&mut self, stream: &mut BufWriter<T>) -> std::io::Result<()> {
         let total = self.wins + self.draws + self.losses;
-        let title = format!("net v.{} vs net v.{}", self.net1_ver, self.net2_ver);
+        let title = format!("{} vs {}", self.player1, self.player2);
         let info = format!("({} games/batch: {}-epoch, {:.2?})", BATCH_SIZE, self.epoch, self.now.elapsed());
         let wdl = format!("wins: {}, draws: {}, losses: {}", self.wins, self.draws, self.losses);
         let stat = format!(
@@ -83,7 +106,7 @@ impl ScoreBoard {
 
     pub fn write<T: Write>(&mut self, stream: &mut T) -> std::io::Result<()> {
         let total = self.wins + self.draws + self.losses;
-        let title = format!("net v.{} vs net v.{}", self.net1_ver, self.net2_ver);
+        let title = format!("{} vs {}", self.player1, self.player2);
         let info = format!("({} games/batch: {}-epoch, {:.2?})", BATCH_SIZE, self.epoch, self.now.elapsed());
         let wdl = format!("wins: {}, draws: {}, losses: {}", self.wins, self.draws, self.losses);
         let stat = format!(

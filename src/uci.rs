@@ -1,13 +1,10 @@
 use std::{
     io,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
-    },
-    time::Duration,
+    sync::Arc,
+    time::{Duration, Instant},
 };
 
-use chessbb::{Side, TranspositionTable};
+use chessbb::Side;
 
 use crate::{AtomicTT, ChessGame, ChessNet, IS_MULTITHREADED_SEARCH, IS_SINGLE_THREADED_MAIN};
 
@@ -107,19 +104,20 @@ pub fn uci_position(chess_game: &mut ChessGame, cmd_str: &str) {
 }
 
 pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt: Arc<AtomicTT>) -> String {
+    let now = Instant::now();
     let mut cmds = cmd_str.split(' ');
     let mut wtime: Duration = Duration::from_secs(1);
     let mut btime: Duration = Duration::from_secs(1);
     let mut winc: Duration = Duration::from_secs(0);
     let mut binc: Duration = Duration::from_secs(0);
-    let mut depth: Option<usize> = None;
+    let mut depth: Option<u16> = None;
     while let Some(cmd) = cmds.next() {
         match cmd {
-            "depth" => depth = Some(cmds.next().unwrap().parse::<usize>().unwrap()),
-            "wtime" => wtime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(600000)),
-            "btime" => btime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(600000)),
-            "winc" => winc = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(600000)),
-            "binc" => binc = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(600000)),
+            "depth" => depth = Some(cmds.next().unwrap().parse::<u16>().unwrap()),
+            "wtime" => wtime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(1)),
+            "btime" => btime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(1)),
+            "winc" => winc = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(0)),
+            "binc" => binc = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(0)),
             _ => (),
         }
     }
@@ -136,9 +134,9 @@ pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt:
     //);
     //search_position(depth)
     let best_move = match (IS_SINGLE_THREADED_MAIN, IS_MULTITHREADED_SEARCH) {
-        (true, _) => net.iterative_deepening_uci_st(chess_game, depth, time_left, tt),
-        (false, true) => net.iterative_deepening_uci_mt(chess_game, depth, time_left, tt),
-        (false, false) => net.iterative_deepening_uci_experimental(chess_game, depth, time_left, tt),
+        (true, _) => net.iterative_deepening_uci_st(chess_game, depth, time_left, tt, now),
+        (false, true) => net.iterative_deepening_uci_mt(chess_game, depth, time_left, tt, now),
+        (false, false) => net.iterative_deepening_uci_experimental(chess_game, depth, time_left, tt, now),
     };
 
     return format!("bestmove {}", best_move.print_move());
