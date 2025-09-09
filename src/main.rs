@@ -60,7 +60,7 @@ enum State {
 }
 const IS_SINGLE_THREADED_MAIN: bool = false;
 const IS_MULTITHREADED_SEARCH: bool = false;
-const IS_ALT: bool = false;
+const IS_ALT: bool = true;
 const START_STRONGER_THAN_RAND: bool = false;
 const FLIP: bool = false;
 
