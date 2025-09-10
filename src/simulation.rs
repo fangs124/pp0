@@ -109,7 +109,7 @@ pub fn play(mut net: ChessNet, mut enm: Option<ChessNet>, tx: Sender<TR>, param:
             }
         }
 
-        chess_game.update_state(chess_move);
+        chess_game.update_state(&chess_move);
         (moves, game_state) = chess_game.try_generate_moves();
     };
 
@@ -157,7 +157,7 @@ fn parse_param(enm_is_some: bool, param: &PlayParameter) -> (NetFindMove, EnmFin
                   moves: Vec<ChessMove>,
                   tt_net: Arc<AtomicTT>,
                   time_limit: Option<Duration>| {
-            return net.find_move(chess_game, FALLBACK_DEPTH, node_count, moves, tt_net, time_limit);
+            return chess_game.find_move(net, FALLBACK_DEPTH, node_count, moves, tt_net, time_limit).1;
         },
     };
 
@@ -169,7 +169,7 @@ fn parse_param(enm_is_some: bool, param: &PlayParameter) -> (NetFindMove, EnmFin
                           moves: Vec<ChessMove>,
                           tt_enm: Arc<AtomicTT>,
                           time_limit: Option<Duration>| {
-                epsilon(EPS, moves, |moves| enm.as_mut().unwrap().find_move(chess_game, STUNTED_FALLBACK_DEPTH, node_count, moves, tt_enm, time_limit))
+                epsilon(EPS, moves, |moves| chess_game.find_move(enm.as_mut().unwrap(), STUNTED_FALLBACK_DEPTH, node_count, moves, tt_enm, time_limit).1)
             },
 
             (false, true) => |_enm: &mut Option<ChessNet>,
@@ -179,7 +179,7 @@ fn parse_param(enm_is_some: bool, param: &PlayParameter) -> (NetFindMove, EnmFin
                               tt_enm: Arc<AtomicTT>,
                               _time_limit: Option<Duration>| {
                 moves.shuffle(&mut rand::rng());
-                epsilon(EPS, moves, |moves| chess_game.find_move(STUNTED_FALLBACK_DEPTH, &mut MATERIAL_EVAL, node_count, moves, tt_enm))
+                epsilon(EPS, moves, |moves| chess_game.find_move(&mut MATERIAL_EVAL, STUNTED_FALLBACK_DEPTH, node_count, moves, tt_enm, None).1)
             },
 
             (false, false) => |_enm: &mut Option<ChessNet>,
@@ -189,7 +189,7 @@ fn parse_param(enm_is_some: bool, param: &PlayParameter) -> (NetFindMove, EnmFin
                                tt_enm: Arc<AtomicTT>,
                                _time_limit: Option<Duration>| {
                 moves.shuffle(&mut rand::rng());
-                chess_game.find_move(STUNTED_FALLBACK_DEPTH, &mut MATERIAL_EVAL, node_count, moves, tt_enm)
+                chess_game.find_move(&mut MATERIAL_EVAL, STUNTED_FALLBACK_DEPTH, node_count, moves, tt_enm, None).1
             },
         };
     return (find_move_net, find_move_enm);

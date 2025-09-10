@@ -1,13 +1,15 @@
 use std::{
     io,
+    ops::Neg,
     sync::{
         Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
+        mpsc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
-use chessbb::{Side, TranspositionTable};
+use chessbb::{ChessMove, NegamaxData, Side, TranspositionTable};
 
 use crate::{AtomicTT, ChessGame, ChessNet, IS_MULTITHREADED_SEARCH, IS_SINGLE_THREADED_MAIN};
 
@@ -42,9 +44,7 @@ impl ChessNet {
                         chessgame = ChessGame::start_pos();
                         tt = Arc::new(AtomicTT::new());
                     }
-                    "go" => {
-                        println!("{}", uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self, tt.clone()))
-                    }
+                    "go" => uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), self, tt.clone()),
                     "quit" => return Ok(()),
                     //TODO
                     _ => {} //???
@@ -77,7 +77,7 @@ pub fn uci_position(chess_game: &mut ChessGame, cmd_str: &str) {
                     *chess_game = ChessGame::from_fen(&fen);
 
                     if DEBUG {
-                        eprintln!("board:\n\r{}", chess_game.cb);
+                        eprintln!("board:\n\r{}", chess_game);
                     }
                     //println!("cmds: {:?}", cmds.clone().collect::<Vec<&str>>());
                     // rnb1kbnr/ppp1pppp/8/4q3/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 0 1
@@ -106,16 +106,17 @@ pub fn uci_position(chess_game: &mut ChessGame, cmd_str: &str) {
     }
 }
 
-pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt: Arc<AtomicTT>) -> String {
+pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt: Arc<AtomicTT>) {
+    let now: Instant = Instant::now();
     let mut cmds = cmd_str.split(' ');
     let mut wtime: Duration = Duration::from_secs(1);
     let mut btime: Duration = Duration::from_secs(1);
     let mut winc: Duration = Duration::from_secs(0);
     let mut binc: Duration = Duration::from_secs(0);
-    let mut depth: Option<usize> = None;
+    let mut max_depth: Option<u16> = None;
     while let Some(cmd) = cmds.next() {
         match cmd {
-            "depth" => depth = Some(cmds.next().unwrap().parse::<usize>().unwrap()),
+            "depth" => max_depth = Some(cmds.next().unwrap().parse::<u16>().unwrap()),
             "wtime" => wtime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(600000)),
             "btime" => btime = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(600000)),
             "winc" => winc = Duration::from_millis(cmds.next().unwrap().parse::<u64>().unwrap_or(600000)),
@@ -123,9 +124,9 @@ pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt:
             _ => (),
         }
     }
-    let time_left: Duration = match chess_game.side() {
-        Side::White => (wtime / BASE_COEFF) + (winc / INCREMENT_COEFF),
-        Side::Black => (btime / BASE_COEFF) + (binc / INCREMENT_COEFF),
+    let time_limit: Duration = match chess_game.side() {
+        Side::White => (wtime / BASE_COEFF) + (winc.checked_sub(Duration::from_millis(5)).unwrap_or(Duration::ZERO) / INCREMENT_COEFF),
+        Side::Black => (btime / BASE_COEFF) + (binc.checked_sub(Duration::from_millis(5)).unwrap_or(Duration::ZERO) / INCREMENT_COEFF),
     };
     //eprintln!(
     //    "wtime: {}ms, winc: {}ms, btime: {}ms, binc:{}ms",
@@ -135,13 +136,65 @@ pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt:
     //    binc.as_millis()
     //);
     //search_position(depth)
-    let best_move = match (IS_SINGLE_THREADED_MAIN, IS_MULTITHREADED_SEARCH) {
-        (true, _) => net.iterative_deepening_uci_st(chess_game, depth, time_left, tt),
-        (false, true) => net.iterative_deepening_uci_mt(chess_game, depth, time_left, tt),
-        (false, false) => net.iterative_deepening_uci_experimental(chess_game, depth, time_left, tt),
+    uci_iterative_deepening(chess_game, net, max_depth, tt, now, time_limit);
+}
+
+pub fn uci_iterative_deepening(chess_game: &mut ChessGame, net: &mut ChessNet, max_depth: Option<u16>, tt: Arc<AtomicTT>, now: Instant, time_limit: Duration) {
+    let moves: Vec<ChessMove> = chess_game.try_generate_moves().0;
+    assert!(!moves.is_empty());
+    let mut node_count: usize = 0;
+    let mut best_move: ChessMove = moves[0].clone();
+
+    let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize, u16)>();
+    let mut d = 0;
+    let max_depth: u16 = match max_depth {
+        Some(x) => x,
+        None => u16::MAX,
     };
 
-    return format!("bestmove {}", best_move.print_move());
+    rayon::spawn(move || {
+        let mut d: u16 = 0;
+        let mut best_move: ChessMove = best_move;
+        let mut duration: Duration = now.elapsed();
+        while duration < time_limit && d <= max_depth {
+            duration = now.elapsed();
+            while let Ok((chess_move_data, eval_data, node_count_data, d_data)) = rx.try_recv() {
+                d = d_data + 1;
+                best_move = chess_move_data;
+                node_count += node_count_data;
+                let nps: usize = (node_count as f64 / duration.as_secs_f64()) as usize;
+                println!("info score cp {eval_data} depth {d} nodes {} nps {nps} time {} pv {}", node_count_data, duration.as_millis(), best_move.print_move());
+            }
+        }
+
+        println!("bestmove {}", best_move.print_move());
+    });
+
+    'search: while now.elapsed() < time_limit && d <= max_depth {
+        let mut best_eval: i16 = i16::MIN + 1;
+        for chess_move in &moves {
+            if now.elapsed() >= time_limit {
+                break 'search;
+            }
+            let snapshot: chessbb::ChessBoardSnapshot = chess_game.explore_state(chess_move);
+            let mut data: NegamaxData = NegamaxData::new_timed(now, time_limit);
+            //let mut data: NegamaxData = NegamaxData::new();
+            let eval: i16 = -chess_game.negamax(None, Some(-best_eval), d as usize, net, &mut data, tt.clone());
+            chess_game.restore_state(snapshot);
+            node_count += data.node_count();
+
+            if eval > best_eval {
+                best_eval = eval;
+                best_move = chess_move.clone();
+            }
+        }
+
+        if let Err(_) = tx.send((best_move, best_eval, node_count, d)) {
+            break;
+        }
+        //send data
+        d += 1;
+    }
 }
 
 const BASE_COEFF: u32 = 10;

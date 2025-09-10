@@ -1,6 +1,11 @@
-use std::sync::Arc;
+use std::{
+    fmt::Display,
+    i16,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
-use chessbb::{ChessBoard, ChessMove, ChessPiece, Evaluator, GameState, NegamaxData, PieceType, Side, Square, TranspositionTable};
+use chessbb::{ChessBoard, ChessBoardSnapshot, ChessMove, ChessPiece, Evaluator, GameState, NegamaxData, PieceType, Side, Square, TranspositionTable};
 use nalgebra::DVector;
 use nnet::{InputType, SparseInputType, SparseVec};
 use rand::random_range;
@@ -9,7 +14,13 @@ use crate::AtomicTT;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChessGame {
-    pub cb: ChessBoard,
+    cb: ChessBoard,
+}
+
+impl Display for ChessGame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.cb.fmt(f)
+    }
 }
 
 impl InputType for ChessGame {
@@ -42,7 +53,7 @@ impl ChessGame {
 
     #[inline(always)]
     pub fn make_move(&mut self, move_str: &str) {
-        self.update_state(self.cb.parse_move(move_str));
+        self.update_state(&self.cb.parse_move(move_str));
     }
 
     #[inline(always)]
@@ -51,24 +62,85 @@ impl ChessGame {
     }
 
     #[inline(always)]
-    pub fn update_state(&mut self, chess_move: ChessMove) {
+    pub fn update_state(&mut self, chess_move: &ChessMove) {
         self.cb.update_state(chess_move);
     }
 
     #[inline(always)]
-    pub fn negamax(&mut self, d: usize, ev: &mut impl Evaluator, data: &mut NegamaxData, tt: Arc<AtomicTT>) -> (i16, Option<ChessMove>) {
-        self.cb.negamax(i16::MIN + 1, i16::MAX - 1, d, ev, data, tt).unwrap()
+    pub fn negamax(&mut self, a: Option<i16>, b: Option<i16>, d: usize, ev: &mut impl Evaluator, data: &mut NegamaxData, tt: Arc<AtomicTT>) -> i16 {
+        self.cb.negamax(a.unwrap_or(i16::MIN + 1), b.unwrap_or(i16::MAX - 1), d, ev, data, tt)
     }
 
     #[inline(always)]
-    pub fn find_move(&mut self, d: usize, ev: &mut impl Evaluator, node_count: &mut usize, moves: Vec<ChessMove>, tt: Arc<AtomicTT>) -> ChessMove {
+    pub fn explore_state(&mut self, chess_move: &ChessMove) -> ChessBoardSnapshot {
+        self.cb.explore_state(chess_move)
+    }
+
+    #[inline(always)]
+    pub fn restore_state(&mut self, snapshot: ChessBoardSnapshot) {
+        self.cb.restore_state(snapshot)
+    }
+
+    pub fn iterative_deepening(
+        &mut self, ev: &mut impl Evaluator, node_count: &mut usize, max_depth: Option<usize>, tt: Arc<AtomicTT>, time_limit: Duration,
+    ) -> (i16, ChessMove) {
+        let now = Instant::now();
+        let moves: Vec<ChessMove> = self.try_generate_moves().0;
+        assert!(!moves.is_empty());
+        let mut best_eval: i16 = i16::MIN + 1;
+        let mut best_move: ChessMove = moves[0].clone();
+        let max_depth = match max_depth {
+            Some(x) => x,
+            None => usize::MAX,
+        };
+
+        let mut d = 1;
+        while now.elapsed() < time_limit && d <= max_depth {
+            best_eval = i16::MIN + 1;
+            for chess_move in &moves {
+                let snapshot: chessbb::ChessBoardSnapshot = self.explore_state(chess_move);
+                let mut data: NegamaxData = NegamaxData::new_timed(now, time_limit);
+                let eval: i16 = -self.negamax(None, Some(-best_eval), d, ev, &mut data, tt.clone());
+                self.restore_state(snapshot);
+                *node_count += data.node_count();
+
+                if eval >= best_eval {
+                    best_eval = eval;
+                    best_move = chess_move.clone();
+                }
+            }
+
+            d += 1;
+        }
+        return (best_eval, best_move);
+    }
+
+    #[inline(always)]
+    pub fn find_move(
+        &mut self, ev: &mut impl Evaluator, d: usize, node_count: &mut usize, moves: Vec<ChessMove>, tt: Arc<AtomicTT>, time_limit: Option<Duration>,
+    ) -> (i16, ChessMove) {
         assert!(moves.len() > 0);
-        //TODO: fix this ugly thing
-        let chess_move: ChessMove = moves[0].clone();
-        let mut data: NegamaxData = NegamaxData::new(Some((moves, GameState::Ongoing)));
-        let chess_move = self.negamax(d, ev, &mut data, tt).1.unwrap_or(chess_move);
+
+        let mut best_move: ChessMove = moves[0].clone();
+        let mut data: NegamaxData = match time_limit {
+            Some(time_limit) => NegamaxData::new_timed(Instant::now(), time_limit),
+            None => NegamaxData::new(),
+        };
+
+        let mut best_score: i16 = i16::MIN + 1;
+        for chess_move in moves {
+            let snapshot: chessbb::ChessBoardSnapshot = self.explore_state(&chess_move);
+            let score: i16 = -self.negamax(None, Some(-best_score), d, ev, &mut data, tt.clone());
+            self.restore_state(snapshot);
+
+            if score >= best_score {
+                best_move = chess_move;
+                best_score = score;
+            }
+        }
+
         *node_count = data.node_count();
-        return chess_move;
+        return (best_score, best_move);
     }
 
     #[inline(always)]

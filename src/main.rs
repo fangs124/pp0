@@ -41,7 +41,7 @@ const STUNTED_FALLBACK_DEPTH: usize = 3;
 const IS_REG: bool = false;
 
 const BASE_TIME: Duration = Duration::from_secs(5);
-const INCREMENT_TIME: Duration = Duration::from_millis(50);
+const INCREMENT_TIME: Duration = Duration::from_millis(5);
 const BASE_COEFF: u32 = 10;
 const INCREMENT_COEFF: u32 = 2;
 const USE_TC: bool = false;
@@ -103,9 +103,7 @@ fn alt_main() -> std::io::Result<()> {
                         chessgame = ChessGame::start_pos();
                         tt = Arc::new(AtomicTT::new());
                     }
-                    "go" => {
-                        println!("{}", uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), &mut chessnet, tt.clone()))
-                    }
+                    "go" => uci_go(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), &mut chessnet, tt.clone()),
                     "quit" => return Ok(()),
                     //TODO
                     _ => {} //???
