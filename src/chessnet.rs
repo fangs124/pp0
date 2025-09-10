@@ -1,12 +1,7 @@
-use core::time;
 use std::{
     i16,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
-        mpsc,
-    },
-    time::{Duration, Instant},
+    sync::{Arc, atomic::AtomicUsize},
+    time::Duration,
 };
 
 use chessbb::{AtomicTranspositionTable, ChessBoard, ChessMove, Evaluator, GameResult, GameState, NegamaxData, Side, TranspositionTable};
@@ -14,11 +9,7 @@ use nalgebra::DVector;
 use rand::random_range;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    AtomicTT, ChessGame, LEARNING_RATE,
-    nnet::*,
-    simulation::{TimeControl, TrainingResult},
-};
+use crate::{AtomicTT, ChessGame, LEARNING_RATE, nnet::*, simulation::TrainingResult};
 
 const MAX_SEARCH_INSTANCE: usize = 16;
 static SEARCH_INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0_usize);
@@ -131,20 +122,4 @@ impl ChessNet {
 #[inline(always)]
 fn compute_scalar(index: usize, total: usize) -> f32 {
     0.4 + (0.6 * (((index) as f32) / (total as f32)))
-}
-
-#[inline(always)]
-fn get_move_rand(_: &mut ChessNet, _: &mut ChessGame, _: usize, moves: &Vec<ChessMove>, _: &mut TranspositionTable) -> ChessMove {
-    moves[random_range(0..moves.len())]
-}
-
-pub struct SearchInfo {
-    pub eval: i16,
-    pub node_count: usize,
-}
-
-impl SearchInfo {
-    pub fn new() -> Self {
-        SearchInfo { eval: i16::MIN, node_count: 0 }
-    }
 }

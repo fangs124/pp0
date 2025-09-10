@@ -63,6 +63,7 @@ const START_STRONGER_THAN_RAND: bool = false;
 const FLIP: bool = false;
 
 fn alt_main() -> std::io::Result<()> {
+    //println!("is_detected: {}", is_x86_feature_detected!("cmpxchg16b"));
     let file = File::open(format!("{:?}net.json", NODE_COUNT))?;
     let mut buf_reader = BufReader::new(file);
     let mut contents = String::new();
