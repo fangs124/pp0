@@ -1,21 +1,15 @@
 use std::{
     io,
-    ops::Neg,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
-        mpsc,
-    },
+    sync::{Arc, mpsc},
     time::{Duration, Instant},
 };
 
-use chessbb::{ChessMove, NegamaxData, Side, TranspositionTable};
+use chessbb::{ChessMove, NegamaxData, Side};
 
-use crate::{AtomicTT, ChessGame, ChessNet, IS_MULTITHREADED_SEARCH, IS_SINGLE_THREADED_MAIN};
+use crate::{AtomicTT, ChessGame, ChessNet};
 
 const DEBUG: bool = false;
-//const foo: usize = size_of::<TranspositionTable>(); //16 bytes
-//const bar: usize = size_of::<Mutex<TranspositionTable>>(); //24 bytes
+
 impl ChessNet {
     pub fn uci_loop_start(&mut self) -> io::Result<()> {
         let mut chessgame = ChessGame::start_pos();

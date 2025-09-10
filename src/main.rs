@@ -1,11 +1,10 @@
-use std::fmt::format;
 use std::fs::File;
-use std::io::{self, BufReader, BufWriter, Read, Write, stdout};
+use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
-use chessbb::{AtomicTranspositionTable, ChessMove, GameResult, Side};
+use chessbb::{AtomicTranspositionTable, GameResult, Side};
 use inquire::Select;
 use rand::random_range;
 use termion::raw::IntoRawMode;
@@ -38,7 +37,6 @@ const UPDATE_PER_BATCH: usize = 2;
 const LEARNING_RATE: f32 = 0.00001;
 const FALLBACK_DEPTH: usize = 3;
 const STUNTED_FALLBACK_DEPTH: usize = 3;
-const IS_REG: bool = false;
 
 const BASE_TIME: Duration = Duration::from_secs(5);
 const INCREMENT_TIME: Duration = Duration::from_millis(5);
@@ -59,7 +57,6 @@ enum State {
     Quit,
 }
 const IS_SINGLE_THREADED_MAIN: bool = false;
-const IS_MULTITHREADED_SEARCH: bool = false;
 const IS_ALT: bool = true;
 const START_STRONGER_THAN_RAND: bool = false;
 const FLIP: bool = false;
