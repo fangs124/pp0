@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{AtomicTT, BASE_COEFF, BASE_TIME, ChessGame, ChessNet, FALLBACK_DEPTH, INCREMENT_COEFF, INCREMENT_TIME, STUNTED_FALLBACK_DEPTH};
+use crate::{AtomicTT, BASE_COEFF, BASE_TIME, ChessGame, ChessNet, FALLBACK_DEPTH, FIXED_NODE_LIMIT, INCREMENT_COEFF, INCREMENT_TIME, STUNTED_FALLBACK_DEPTH};
 use chessbb::{AtomicTranspositionTable, ChessMove, GameResult, GameState, MATERIAL_EVAL, Side, TranspositionTable};
 use nnet::SparseVec;
 use rand::{random_bool, random_range, seq::SliceRandom};
@@ -157,7 +157,7 @@ fn parse_param(enm_is_some: bool, param: &PlayParameter) -> (NetFindMove, EnmFin
                   moves: Vec<ChessMove>,
                   tt_net: Arc<AtomicTT>,
                   time_limit: Option<Duration>| {
-            return chess_game.find_move(net, FALLBACK_DEPTH, node_count, moves, tt_net, time_limit).1;
+            return chess_game.iterative_deepening(net, node_count, Some(moves), tt_net, time_limit, Some(FIXED_NODE_LIMIT)).1;
         },
     };
 
