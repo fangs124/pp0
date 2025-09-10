@@ -6,7 +6,7 @@ use std::{
 
 use chessbb::{ChessMove, NegamaxData, Side};
 
-use crate::{AtomicTT, ChessGame, ChessNet};
+use crate::{AtomicTT, ChessGame, ChessNet, MILLIS_MARGIN};
 
 const DEBUG: bool = false;
 
@@ -119,9 +119,11 @@ pub fn uci_go(chess_game: &mut ChessGame, cmd_str: &str, net: &mut ChessNet, tt:
         }
     }
     let time_limit: Duration = match chess_game.side() {
-        Side::White => (wtime / BASE_COEFF) + (winc.checked_sub(Duration::from_millis(5)).unwrap_or(Duration::ZERO) / INCREMENT_COEFF),
-        Side::Black => (btime / BASE_COEFF) + (binc.checked_sub(Duration::from_millis(5)).unwrap_or(Duration::ZERO) / INCREMENT_COEFF),
-    };
+        Side::White => (wtime / BASE_COEFF) + (winc / INCREMENT_COEFF),
+        Side::Black => (btime / BASE_COEFF) + (binc / INCREMENT_COEFF),
+    }
+    .checked_sub(MILLIS_MARGIN)
+    .unwrap_or(Duration::ZERO);
     //eprintln!(
     //    "wtime: {}ms, winc: {}ms, btime: {}ms, binc:{}ms",
     //    wtime.as_millis(),
@@ -152,7 +154,7 @@ pub fn uci_iterative_deepening(chess_game: &mut ChessGame, net: &mut ChessNet, m
         let mut duration: Duration = now.elapsed();
         while duration < time_limit && d <= max_depth {
             duration = now.elapsed();
-            while let Ok((chess_move_data, eval_data, node_count_data, d_data)) = rx.try_recv() {
+            if let Ok((chess_move_data, eval_data, node_count_data, d_data)) = rx.try_recv() {
                 d = d_data + 1;
                 best_move = chess_move_data;
                 node_count += node_count_data;

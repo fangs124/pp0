@@ -40,6 +40,7 @@ const STUNTED_FALLBACK_DEPTH: usize = 3;
 
 const BASE_TIME: Duration = Duration::from_secs(5);
 const INCREMENT_TIME: Duration = Duration::from_millis(5);
+const MILLIS_MARGIN: Duration = Duration::from_millis(10);
 const BASE_COEFF: u32 = 10;
 const INCREMENT_COEFF: u32 = 2;
 const USE_TC: bool = false;
