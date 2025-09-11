@@ -1,5 +1,6 @@
 use std::{
     i16,
+    num::NonZero,
     sync::{Arc, atomic::AtomicUsize},
     time::Duration,
 };
@@ -81,11 +82,11 @@ impl ChessNet {
     }
 
     pub fn learn(
-        &mut self, cg: &mut ChessGame, d: usize, node_count: &mut usize, ins: &mut Vec<SparseVec>, outs: &mut Vec<i16>, moves: Vec<ChessMove>,
-        tt: Arc<AtomicTT>, time_limit: Option<Duration>,
+        &mut self, cg: &mut ChessGame, node_count: &mut usize, ins: &mut Vec<SparseVec>, outs: &mut Vec<i16>, moves: Vec<ChessMove>, tt: Arc<AtomicTT>,
+        node_limit: Option<NonZero<usize>>, time_limit: Option<Duration>,
     ) -> ChessMove {
         ins.push(cg.to_sparse_vec());
-        let (best_eval, best_move) = cg.find_move(self, d, node_count, moves, tt, time_limit);
+        let (best_eval, best_move) = cg.iterative_deepening(self, node_count, Some(moves), tt, time_limit, node_limit);
         outs.push(best_eval);
         return best_move;
     }

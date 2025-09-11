@@ -35,7 +35,7 @@ const BATCH_SIZE: usize = 10000; //~4.8 Mil?
 const REVIEW_SIZE: usize = 1000;
 const UPDATE_PER_BATCH: usize = 2;
 
-const LEARNING_RATE: f32 = 0.00001;
+const LEARNING_RATE: f32 = 0.0001;
 const FIXED_NODE_LIMIT: NonZero<usize> = NonZero::new(1 << 16).unwrap();
 const FALLBACK_DEPTH: usize = 3;
 const STUNTED_FALLBACK_DEPTH: usize = 3;

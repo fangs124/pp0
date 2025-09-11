@@ -147,7 +147,7 @@ fn parse_param(enm_is_some: bool, param: &PlayParameter) -> (NetFindMove, EnmFin
                  moves: Vec<ChessMove>,
                  tt_net: Arc<AtomicTT>,
                  time_limit: Option<Duration>| {
-            return net.learn(chess_game, FALLBACK_DEPTH, node_count, ins, outs, moves, tt_net, time_limit);
+            return net.learn(chess_game, node_count, ins, outs, moves, tt_net, Some(FIXED_NODE_LIMIT), time_limit);
         },
         false => |net: &mut ChessNet,
                   chess_game: &mut ChessGame,
