@@ -58,10 +58,16 @@ enum State {
     Quit,
 }
 const IS_SINGLE_THREADED_MAIN: bool = false;
-const IS_ALT: bool = true;
+const IS_ALT: bool = false;
 const START_STRONGER_THAN_RAND: bool = false;
-const FLIP: bool = false;
-
+const FLIP: bool = true;
+const UHO_LICHESS_BOOK: &str = "UHO_Lichess_4852_v1.epd";
+const POPULAR_LICHESS_BOOK: &str = "Upopularpos_lichess_v3.epd";
+const IS_UNBALANCED_BOOK: bool = false;
+const BOOK: &str = match IS_UNBALANCED_BOOK {
+    true => UHO_LICHESS_BOOK,
+    false => POPULAR_LICHESS_BOOK,
+};
 fn alt_main() -> std::io::Result<()> {
     //println!("is_detected: {}", is_x86_feature_detected!("cmpxchg16b"));
     let file = File::open(format!("{:?}net.json", NODE_COUNT))?;
@@ -172,7 +178,7 @@ fn train_st(net: &mut ChessNet) -> std::io::Result<()> {
     let f = File::create(format!("{:?}.log", NODE_COUNT)).unwrap();
     let mut f_buff: BufWriter<&File> = BufWriter::new(&f);
 
-    let mut f_uho_lichess = File::open("UHO_Lichess_4852_v1.epd")?;
+    let mut f_uho_lichess = File::open(BOOK)?;
     let mut s_uho_lichess = String::new();
     f_uho_lichess.read_to_string(&mut s_uho_lichess)?;
     let uho_lichess: Vec<String> = s_uho_lichess.split('\n').map(|s| s.to_string()).collect();
@@ -399,7 +405,7 @@ fn train(net: &mut ChessNet) -> std::io::Result<()> {
     let f = File::create(format!("{:?}.log", NODE_COUNT)).unwrap();
     let mut f_buff: BufWriter<&File> = BufWriter::new(&f);
 
-    let mut f_uho_lichess = File::open("UHO_Lichess_4852_v1.epd")?;
+    let mut f_uho_lichess = File::open(BOOK)?;
     let mut s_uho_lichess = String::new();
     f_uho_lichess.read_to_string(&mut s_uho_lichess)?;
     let uho_lichess: Vec<String> = s_uho_lichess.split('\n').map(|s| s.to_string()).collect();
