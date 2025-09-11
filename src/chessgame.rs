@@ -1,6 +1,7 @@
 use std::{
     fmt::Display,
     i16,
+    num::NonZero,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -82,24 +83,22 @@ impl ChessGame {
     }
 
     pub fn iterative_deepening(
-        &mut self, ev: &mut impl Evaluator, node_count: &mut usize, max_depth: Option<usize>, tt: Arc<AtomicTT>, time_limit: Duration,
+        &mut self, ev: &mut impl Evaluator, node_count: &mut usize, moves: Option<Vec<ChessMove>>, tt: Arc<AtomicTT>, time_limit: Option<Duration>,
+        node_limit: Option<NonZero<usize>>,
     ) -> (i16, ChessMove) {
+        assert!(time_limit.is_some() || node_limit.is_some());
         let now = Instant::now();
-        let moves: Vec<ChessMove> = self.try_generate_moves().0;
+        let moves: Vec<ChessMove> = moves.unwrap_or_else(|| self.try_generate_moves().0);
         assert!(!moves.is_empty());
         let mut best_eval: i16 = i16::MIN + 1;
         let mut best_move: ChessMove = moves[0].clone();
-        let max_depth = match max_depth {
-            Some(x) => x,
-            None => usize::MAX,
-        };
 
         let mut d = 1;
-        while now.elapsed() < time_limit && d <= max_depth {
+        while *node_count <= node_limit.map_or(usize::MAX, |x| x.get()) && time_limit.map_or(true, |x| now.elapsed() < x) {
             best_eval = i16::MIN + 1;
             for chess_move in &moves {
                 let snapshot: chessbb::ChessBoardSnapshot = self.explore_state(chess_move);
-                let mut data: NegamaxData = NegamaxData::new_timed(now, time_limit);
+                let mut data: NegamaxData = NegamaxData::new(node_limit, time_limit.map_or(None, |x| Some((now, x))));
                 let eval: i16 = -self.negamax(None, Some(-best_eval), d, ev, &mut data, tt.clone());
                 self.restore_state(snapshot);
                 *node_count += data.node_count();
@@ -115,7 +114,6 @@ impl ChessGame {
         return (best_eval, best_move);
     }
 
-    #[inline(always)]
     pub fn find_move(
         &mut self, ev: &mut impl Evaluator, d: usize, node_count: &mut usize, moves: Vec<ChessMove>, tt: Arc<AtomicTT>, time_limit: Option<Duration>,
     ) -> (i16, ChessMove) {
@@ -124,7 +122,7 @@ impl ChessGame {
         let mut best_move: ChessMove = moves[0].clone();
         let mut data: NegamaxData = match time_limit {
             Some(time_limit) => NegamaxData::new_timed(Instant::now(), time_limit),
-            None => NegamaxData::new(),
+            None => NegamaxData::new_no_limit(),
         };
 
         let mut best_score: i16 = i16::MIN + 1;
