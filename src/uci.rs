@@ -142,7 +142,7 @@ pub fn uci_iterative_deepening(chess_game: &mut ChessGame, net: &mut ChessNet, m
     let mut best_move: ChessMove = moves[0].clone();
 
     let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize, u16)>();
-    let mut d = 0;
+    let mut d = 1;
     let max_depth: u16 = match max_depth {
         Some(x) => x,
         None => u16::MAX,

@@ -92,23 +92,23 @@ impl ChessGame {
         assert!(!moves.is_empty());
         let mut best_eval: i16 = i16::MIN + 1;
         let mut best_move: ChessMove = moves[0].clone();
+        let mut best_d: usize = 0;
 
         let mut d = 1;
         while *node_count <= node_limit.map_or(usize::MAX, |x| x.get()) && time_limit.map_or(true, |x| now.elapsed() < x) {
-            best_eval = i16::MIN + 1;
-            for chess_move in &moves {
+            for chess_move in [best_move].iter().chain(moves.iter()) {
                 let snapshot: chessbb::ChessBoardSnapshot = self.explore_state(chess_move);
                 let mut data: NegamaxData = NegamaxData::new(node_limit, time_limit.map_or(None, |x| Some((now, x))));
                 let eval: i16 = -self.negamax(None, Some(-best_eval), d, ev, &mut data, tt.clone());
                 self.restore_state(snapshot);
                 *node_count += data.node_count();
 
-                if eval >= best_eval {
+                if eval >= best_eval || d > best_d {
                     best_eval = eval;
                     best_move = chess_move.clone();
+                    best_d = d;
                 }
             }
-
             d += 1;
         }
         return (best_eval, best_move);
