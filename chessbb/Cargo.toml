@@ -1,0 +1,25 @@
+[package]
+name    = "chessbb"
+version = "0.1.0"
+edition = "2024"
+
+[profile.release]
+#strip = "symbols"
+opt-level       = 3
+lto             = true
+codegen-units   = 1
+debug           = 1
+incremental     = false
+overflow-checks = false
+
+[dependencies]
+arrayvec = {version = "0.7.6", optional = true}
+smallvec = {version = "1.15.*", features = [
+    "const_generics",
+], optional = true}
+
+[features]
+default          = [ "arrayvec", "piececolourboard" ]
+arrayvec         = [ "dep:arrayvec" ]
+smallvec         = [ "dep:smallvec" ]
+piececolourboard = [  ]
