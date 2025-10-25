@@ -17,8 +17,6 @@ pub(crate) struct PieceColourBoard {
 impl Debug for PieceColourBoard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut i: usize = 0;
-        //write!(f, "\n")?;
-        //write!(f, "PieceColourBoard\n")?;
         while i < 6 {
             write!(f, "(piece[{}]: {})\n", i, PIECE_LABELS[i])?;
             write!(f, "{}\n", self.piece[i])?;
@@ -36,30 +34,19 @@ impl Debug for PieceColourBoard {
 
 impl PieceColourBoard {
     pub(crate) const EMPTY_BOARD: PieceColourBoard = PieceColourBoard { colour: [Bitboard::ZERO; 2], piece: [Bitboard::ZERO; 6] };
-
     pub(crate) const START_BOARD: PieceColourBoard = PieceColourBoard {
-        colour: [
-            PieceBoard::START_BOARD.0[00]
-                .bit_or(&PieceBoard::START_BOARD.0[01])
-                .bit_or(&PieceBoard::START_BOARD.0[02])
-                .bit_or(&PieceBoard::START_BOARD.0[03])
-                .bit_or(&PieceBoard::START_BOARD.0[04])
-                .bit_or(&PieceBoard::START_BOARD.0[05]),
-            PieceBoard::START_BOARD.0[06]
-                .bit_or(&PieceBoard::START_BOARD.0[07])
-                .bit_or(&PieceBoard::START_BOARD.0[08])
-                .bit_or(&PieceBoard::START_BOARD.0[09])
-                .bit_or(&PieceBoard::START_BOARD.0[10])
-                .bit_or(&PieceBoard::START_BOARD.0[11]),
+        piece: [
+            Bitboard::new(0b00000000_11111111_00000000_00000000_00000000_00000000_11111111_00000000), // ♟♙
+            Bitboard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_01000010), // ♞♘
+            Bitboard::new(0b00100100_00000000_00000000_00000000_00000000_00000000_00000000_00100100), // ♝♗
+            Bitboard::new(0b10000001_00000000_00000000_00000000_00000000_00000000_00000000_10000001), // ♜♖
+            Bitboard::new(0b00010000_00000000_00000000_00000000_00000000_00000000_00000000_00010000), // ♛♕
+            Bitboard::new(0b00001000_00000000_00000000_00000000_00000000_00000000_00000000_00001000), // ♚♔
         ],
 
-        piece: [
-            PieceBoard::START_BOARD.0[00].bit_or(&PieceBoard::START_BOARD.0[06]),
-            PieceBoard::START_BOARD.0[01].bit_or(&PieceBoard::START_BOARD.0[07]),
-            PieceBoard::START_BOARD.0[02].bit_or(&PieceBoard::START_BOARD.0[08]),
-            PieceBoard::START_BOARD.0[03].bit_or(&PieceBoard::START_BOARD.0[09]),
-            PieceBoard::START_BOARD.0[04].bit_or(&PieceBoard::START_BOARD.0[10]),
-            PieceBoard::START_BOARD.0[05].bit_or(&PieceBoard::START_BOARD.0[11]),
+        colour: [
+            Bitboard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_11111111_11111111), // White
+            Bitboard::new(0b11111111_11111111_00000000_00000000_00000000_00000000_00000000_00000000), // Black
         ],
     };
 
@@ -113,8 +100,8 @@ impl PieceBoard {
         Bitboard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00010000), // ♛
         Bitboard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00001000), // ♚
         Bitboard::new(0b00000000_11111111_00000000_00000000_00000000_00000000_00000000_00000000), // ♙
-        Bitboard::new(0b00100100_00000000_00000000_00000000_00000000_00000000_00000000_00000000), // ♗
         Bitboard::new(0b01000010_00000000_00000000_00000000_00000000_00000000_00000000_00000000), // ♘
+        Bitboard::new(0b00100100_00000000_00000000_00000000_00000000_00000000_00000000_00000000), // ♗
         Bitboard::new(0b10000001_00000000_00000000_00000000_00000000_00000000_00000000_00000000), // ♖
         Bitboard::new(0b00010000_00000000_00000000_00000000_00000000_00000000_00000000_00000000), // ♕
         Bitboard::new(0b00001000_00000000_00000000_00000000_00000000_00000000_00000000_00000000), // ♔

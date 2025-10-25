@@ -4,7 +4,7 @@
 //use crate::chessmove::Castling;
 use crate::{
     Bitboard, ChessPiece, Side,
-    chessboard::{ChessBoard, Mailbox, cp_index},
+    chessboard::{ChessBoard, cp_index, mailbox::Mailbox},
     chessmove::Castling,
     square::Square,
 };
@@ -59,11 +59,6 @@ impl ZobristTable {
 
 impl ZobristHash {
     pub(super) const ZERO: ZobristHash = ZobristHash(0);
-
-    #[inline(always)]
-    pub(super) const fn to_usize(&self) -> usize {
-        self.0 as usize
-    }
 
     #[inline(always)]
     pub(super) const fn to_u64(&self) -> u64 {

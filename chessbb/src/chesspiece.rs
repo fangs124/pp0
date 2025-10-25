@@ -128,19 +128,19 @@ impl ChessPiece {
         ChessPiece(Side::Black, PieceType::Pawn),
     ];
 
-    const ALL_PIECES: [ChessPiece; 12] = [
-        ChessPiece(Side::White, PieceType::King),
-        ChessPiece(Side::White, PieceType::Queen),
+    pub(crate) const PIECES: [ChessPiece; 12] = [
+        ChessPiece(Side::White, PieceType::Pawn),
         ChessPiece(Side::White, PieceType::Knight),
         ChessPiece(Side::White, PieceType::Bishop),
         ChessPiece(Side::White, PieceType::Rook),
-        ChessPiece(Side::White, PieceType::Pawn),
-        ChessPiece(Side::Black, PieceType::King),
-        ChessPiece(Side::Black, PieceType::Queen),
+        ChessPiece(Side::White, PieceType::Queen),
+        ChessPiece(Side::White, PieceType::King),
+        ChessPiece(Side::Black, PieceType::Pawn),
         ChessPiece(Side::Black, PieceType::Knight),
         ChessPiece(Side::Black, PieceType::Bishop),
         ChessPiece(Side::Black, PieceType::Rook),
-        ChessPiece(Side::Black, PieceType::Pawn),
+        ChessPiece(Side::Black, PieceType::Queen),
+        ChessPiece(Side::Black, PieceType::King),
     ];
 
     pub fn white_iter() -> slice::Iter<'static, ChessPiece> {
@@ -152,7 +152,7 @@ impl ChessPiece {
     }
 
     pub fn iter() -> slice::Iter<'static, ChessPiece> {
-        ChessPiece::ALL_PIECES.iter()
+        ChessPiece::PIECES.iter()
     }
 
     pub(crate) const WK: ChessPiece = ChessPiece(Side::White, PieceType::King);

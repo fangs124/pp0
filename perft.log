@@ -1,0 +1,40 @@
+============= [[ old code ]] ============
+total positions: 21282919337, time: 181785ms
+speed: 117.08Mnps <-- old perft, bulk
+total positions: 21282919337, time: 702693ms
+speed: 30.29Mnps  <-- old perft, non-bulk
+total positions: 21282919337, time: 591325ms
+speed: 35.99Mnps  <-- new perft, non-bulk (Vec::with_capacity(40), and passing `&mut Vec`)
+total positions: 21282919337, time: 583415ms
+speed: 36.48Mnps  <-- newer perft, non-bulk with ArrayVec<ChessMove,218>
+total positions: 21282919337, time: 628440ms
+speed: 33.87Mnps  <-- newer perft, non-bulk with ArrayVec<ChessMove,100>
+total positions: 21282919337, time: 190034ms
+speed: 112.00Mnps <-- latest perft, FAKE NEWS?!?! ~~non-bulk with cozy-chess tech + (Vec::with_capacity(40), and passing `&mut Vec`)~~
+total positions: 21282919337, time: 331236ms
+speed: 64.25Mnps  <-- latest perft, non-bulk with cozy-chess tech + (Vec::with_capacity(40), and passing `&mut Vec`)
+total positions: 21282919337, time: 327609ms
+speed: 64.96Mnps <-- latest perft, non-bulk with cozy-chess tech + ArrayVec<ChessMove,218>
+total positions: 21282919337, time: 370491ms
+speed: 57.45Mnps <-- latest perft, non-bulk with cozy-chess tech + SmallVec<[ChessMove,64]>
+total positions: 21282919337, time: 321956ms
+speed: 66.10Mnps <-- new baseline perft going forward. Removed zobrist_table keep up for perft. Has cozy-chess tech + vanilla Vec and other clean up
+total positions: 21282919337, time: 315344ms
+speed: 67.49Mnps <-- non-bulk with ArrayVec<ChessMove,218>
+
+==== [[6 piece + 2 colour bitboard]] ==== <-- new code
+total positions: 21282919337, time: 377482ms
+speed: 56.38Mnps
+
+========= [[12 piece bitboard]] ========= <-- new code
+total positions: 21282919337, time: 346335ms
+speed: 61.45Mnps
+
+========= [[6 piece + 2 colour bitboardd]] ========= diag array, row/col array
+total positions: 21282919337, time: 323835ms
+speed: 65.72Mnps
+========= [[6 piece + 2 colour bitboardd]] ========= diag array, row/col maths
+total positions: 21282919337, time: 314834ms
+speed: 67.60Mnps
+
+============== [[12 piece bitboard]] =============== diag array, row/col maths

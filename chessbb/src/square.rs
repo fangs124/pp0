@@ -36,21 +36,124 @@ impl Display for Square {
 }
 
 impl Square {
+    #[inline(always)]
     pub const fn to_usize(&self) -> usize {
         *self as usize
     }
 
+    #[inline(always)]
     pub const fn to_u8(&self) -> u8 {
         *self as u8
     }
 
+    #[inline(always)]
     pub const fn to_col_usize(&self) -> usize {
         (*self as usize) % 8
     }
 
+    #[inline(always)]
     pub const fn to_row_usize(&self) -> usize {
         (*self as usize) / 8
     }
+
+    #[inline(always)]
+    pub(crate)const fn is_same_diag(s1: Square, s2: Square, s3: Square) -> bool {
+        Square::is_same_adiag(s1, s2) && Square::is_same_adiag(s2, s3) || Square::is_same_ddiag(s1, s2) && Square::is_same_ddiag(s2, s3)
+    }
+
+    //#[inline(always)]
+    //pub(crate) const fn is_same_diag(s1: Square, s2: Square) -> bool {
+    //    Square::is_same_ddiag(s1, s2) || Square::is_same_adiag(s1, s2)
+    //}
+
+    #[inline(always)]
+    pub(crate)const fn is_same_ddiag(s1: Square, s2: Square) -> bool {
+        Square::DDIAG[s1.to_usize()] == Square::DDIAG[s2.to_usize()]
+    }
+
+
+    #[inline(always)]
+    pub(crate)const fn is_same_adiag(s1: Square, s2: Square) -> bool {
+        Square::ADIAG[s1.to_usize()] == Square::ADIAG[s2.to_usize()]
+    }
+    
+    #[inline(always)]
+    pub(crate)const fn is_same_row(s1: Square, s2: Square) -> bool {
+        s1.to_row_usize() == s2.to_row_usize()
+    }
+    
+    #[inline(always)]
+    pub(crate) const fn is_same_col(s1: Square, s2: Square) -> bool {
+        s1.to_col_usize() == s2.to_col_usize()
+    }
+
+    //#[inline(always)]
+    //pub(crate) const fn _is_same_ddiag(s1: Square, s2: Square) -> bool {
+    //    (s1.to_row_usize().abs_diff(s2.to_row_usize())) == (s1.to_col_usize().abs_diff(s2.to_col_usize()))
+    //}
+    
+    //#[inline(always)]
+    //pub(crate) const fn _is_same_adiag(s1: Square, s2: Square) -> bool {
+    //    (s1.to_row_usize().abs_diff(s2.to_row_usize())) + (s1.to_col_usize().abs_diff(s2.to_col_usize())) == 0
+    //}
+    
+    //#[inline(always)]
+    //pub(crate) const fn is_same_row(s1: Square, s2: Square) -> bool {
+    //    Square::ROWS[s1.to_usize()] == Square::ROWS[s2.to_usize()]
+    //}
+    
+    //#[inline(always)]
+    //pub(crate) const fn is_same_col(s1: Square, s2: Square) -> bool {
+    //    Square::COLS[s1.to_usize()] == Square::COLS[s2.to_usize()]
+    //}
+    
+    #[rustfmt::skip]
+    const DDIAG: [u8; 64] = [
+        00, 01, 02, 03, 04, 05, 06, 07,
+        01, 02, 03, 04, 05, 06, 07, 08,
+        02, 03, 04, 05, 06, 07, 08, 09,
+        03, 04, 05, 06, 07, 08, 09, 10,
+        04, 05, 06, 07, 08, 09, 10, 11,
+        05, 06, 07, 08, 09, 10, 11, 12,
+        06, 07, 08, 09, 10, 11, 12, 13,
+        07, 08, 09, 10, 11, 12, 13, 14,
+    ];
+
+    #[rustfmt::skip]
+    const ADIAG: [u8; 64] = [
+        07, 06, 05, 04, 03, 02, 01, 00,
+        08, 07, 06, 05, 04, 03, 02, 01,
+        09, 08, 07, 06, 05, 04, 03, 02,
+        10, 09, 08, 07, 06, 05, 04, 03,
+        11, 10, 09, 08, 07, 06, 05, 04,
+        12, 11, 10, 09, 08, 07, 06, 05,
+        13, 12, 11, 10, 09, 08, 07, 06,
+        14, 13, 12, 11, 10, 09, 08, 07,
+    ];
+
+    #[rustfmt::skip]
+    const ROWS: [u8; 64] = [
+        0, 0, 0, 0, 0, 0, 0, 0,
+        1, 1, 1, 1, 1, 1, 1, 1,
+        2, 2, 2, 2, 2, 2, 2, 2,
+        3, 3, 3, 3, 3, 3, 3, 3,
+        4, 4, 4, 4, 4, 4, 4, 4,
+        5, 5, 5, 5, 5, 5, 5, 5,
+        6, 6, 6, 6, 6, 6, 6, 6,
+        7, 7, 7, 7, 7, 7, 7, 7,
+    ];
+    
+    #[rustfmt::skip]
+    const COLS: [u8; 64] = [
+        0, 1, 2, 3, 4, 5, 6, 7,
+        0, 1, 2, 3, 4, 5, 6, 7,
+        0, 1, 2, 3, 4, 5, 6, 7,
+        0, 1, 2, 3, 4, 5, 6, 7,
+        0, 1, 2, 3, 4, 5, 6, 7,
+        0, 1, 2, 3, 4, 5, 6, 7,
+        0, 1, 2, 3, 4, 5, 6, 7,
+        0, 1, 2, 3, 4, 5, 6, 7,
+    ];
 
     pub const fn left(&self) -> Square {
         Square::SQUARES[(*self as usize) - 1]

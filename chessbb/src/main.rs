@@ -18,7 +18,6 @@ fn main() {
 }
 const START_DEPTH: usize = 2;
 const MAX_DEPTH: usize = 2;
-const PERFT_PER_MOVE: bool = false;
 const PANIC_ON_ERROR: bool = true;
 fn perft_test(fen: &str, raw_moves: Vec<u16>, is_bulk: bool) {
     println!("\n============== history ===============");
@@ -88,36 +87,21 @@ fn perft_suite(skip_to: Option<usize>, is_bulk: bool) {
                 continue;
             }
         }
-        let mut chessboard = ChessBoard::from_fen(start_fen);
+        let chessboard = ChessBoard::from_fen(start_fen);
         println!("\n========= position number {:3<} =========", num);
         println!("fen: {start_fen}");
         println!("=======================================\n");
         println!("{}", chessboard.print_board());
+        //println!("{}", chessboard.print_board_debug());
 
         for section in sections {
             let section_vec: Vec<_> = section.split_ascii_whitespace().collect();
             let depth: usize = section_vec[0].chars().filter(|x| x.is_ascii_digit()).collect::<String>().parse().unwrap();
             let result_count: u64 = section_vec[1].parse().unwrap();
-            let now: Instant = Instant::now();
-            let mut moves = chessboard.generate_moves();
-            moves.sort_by(LexiOrd::lexi_cmp);
-            let mut result_str_vec = Vec::<String>::new();
-            let mut total_count: u64 = 0;
-            if PERFT_PER_MOVE {
-                for chess_move in moves {
-                    let mut s = chess_move.print_move();
 
-                    let mut new_chessboard = chessboard.clone();
-                    let branch_total: u64 = new_chessboard.perft_count(depth - 1, is_bulk);
-                    total_count += branch_total;
-                    s.push_str(format!(" - {:<6}", branch_total).as_str());
-                    s.push_str(format!(" - data: {}", chess_move.data()).as_str());
-                    result_str_vec.push(s);
-                }
-            } else {
-                total_count = chessboard.perft_count(depth, is_bulk);
-            }
-            elapsed_total += now.elapsed();
+            let (total_count, elapsed) = chessboard.perft_count_timed(depth, is_bulk);
+            elapsed_total += elapsed;
+
             let result_str = match result_count == total_count {
                 true => "Ok!",
                 false => "Error!",
@@ -126,12 +110,9 @@ fn perft_suite(skip_to: Option<usize>, is_bulk: bool) {
             println!("depth: {depth}, result_count: {result_count}, total_count: {total_count}, {result_str}");
             if result_str == "Error!" {
                 has_error = true;
-                for result_str in result_str_vec {
-                    println!("{result_str}");
-                }
                 println!("");
                 if PANIC_ON_ERROR {
-                    panic!();
+                    panic!("fen:{}, depth: {}", section, depth);
                 }
             }
             node_count += total_count;
