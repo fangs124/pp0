@@ -88,7 +88,7 @@ fn perft_suite(skip_to: Option<usize>, is_bulk: bool) {
             }
         }
         let chessboard = ChessBoard::from_fen(start_fen);
-        println!("\n========= position number {:3<} =========", num);
+        println!("\n========= position number {:<3} =========", num);
         println!("fen: {start_fen}");
         println!("=======================================\n");
         println!("{}", chessboard.print_board());

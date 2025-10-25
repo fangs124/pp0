@@ -10,8 +10,17 @@ smallvec = {version = "1.15.*", features = [
 ], optional = true}
 
 [features]
-default          = [ "arrayvec" ]
-arrayvec         = [ "dep:arrayvec" ]
-smallvec         = [ "dep:smallvec" ]
+default = [
+    "arrayvec",
+    "rowcolmath",
+    "maybemailbox",
+    "piececolourboard",
+    "kinglessattackmask",
+]
+arrayvec = [ "dep:arrayvec" ]
+smallvec = [ "dep:smallvec" ]
 piececolourboard = [  ]
-maybemailbox     = [  ]
+maybemailbox = [  ]
+kinglessattackmask = [  ]
+rowcolmath = [  ]
+diagmath = [  ]

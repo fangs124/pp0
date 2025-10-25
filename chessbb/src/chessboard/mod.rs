@@ -396,8 +396,7 @@ impl ChessBoard {
     pub fn perft_count_timed(&self, depth: usize, is_bulk: bool) -> (u64, Duration) {
         let now = Instant::now();
         let total_count = self.perft_count(depth, is_bulk);
-        let elapsed = now.elapsed();
-        return (total_count, elapsed);
+        return (total_count, now.elapsed());
     }
 
     pub fn perft_count(&self, depth: usize, is_bulk: bool) -> u64 {
@@ -468,7 +467,9 @@ impl ChessBoard {
         let mut moves: MoveList = Vec::with_capacity(40);
 
         let side: Side = self.data.side_to_move;
+        #[cfg(feature = "kingattackmask")]
         let kingless_blockers: Bitboard = self.bitboards.blockers().bit_xor(&self.bitboards.piece_bitboard(ChessPiece(side, PieceType::King)));
+        #[cfg(feature = "kingattackmask")]
         let kingless_attack_mask: Bitboard = self.calculate_attacked_mask(kingless_blockers);
 
         // consider if king is in check
@@ -518,12 +519,11 @@ impl ChessBoard {
                 let source: Square = sources.lsb_square().unwrap();
 
                 /* moves and attacks */
-                self.calculate_moves(source, piece_type, &kingless_attack_mask, &mut moves);
+                self.calculate_moves(source, piece_type, &mut moves);
                 sources.pop_lsb();
             }
         }
 
-        //moves.append(&mut king_moves);
         return moves;
     }
 
@@ -565,7 +565,7 @@ impl ChessBoard {
         };
     }
 
-    fn calculate_moves(&self, source: Square, piece_type: PieceType, kingless_attack_mask: &Bitboard, moves: &mut MoveList) {
+    fn calculate_moves(&self, source: Square, piece_type: PieceType, #[cfg(feature = "kingattackmask")] kingless_attack_mask: &Bitboard, moves: &mut MoveList) {
         //pawn rules are complex, best handled separately, use calculate_pawn_moves()
         if matches!(piece_type, PieceType::Pawn) {
             self.calculate_pawn_moves(source, moves);
@@ -603,6 +603,7 @@ impl ChessBoard {
             targets = targets.bit_and(&check_mask.bit_or(&self.data.check_bb));
         }
 
+        #[cfg(feature = "kingattackmask")]
         //king: cannot move to a square under attack
         if piece_type == PieceType::King {
             targets = targets.bit_and(&kingless_attack_mask.bit_not());
@@ -610,6 +611,15 @@ impl ChessBoard {
 
         while targets.is_not_zero() {
             let target: Square = targets.lsb_square().unwrap();
+            //king: cannot move to a square under attack
+            #[cfg(not(feature = "kingattackmask"))]
+            if piece_type == PieceType::King {
+                let kingless_blockers = self.bitboards.blockers().bit_xor(&self.bitboards.piece_bitboard(ChessPiece(side, PieceType::King)));
+                if self.is_square_attacked(target, side.update(), kingless_blockers) {
+                    targets.pop_lsb();
+                    continue;
+                };
+            }
 
             //append moves
             moves.push(ChessMove::new(source, target, MoveType::Normal));

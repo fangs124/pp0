@@ -66,46 +66,53 @@ impl Square {
     //    Square::is_same_ddiag(s1, s2) || Square::is_same_adiag(s1, s2)
     //}
 
+     #[cfg(not(feature = "diagmath"))]
     #[inline(always)]
     pub(crate)const fn is_same_ddiag(s1: Square, s2: Square) -> bool {
         Square::DDIAG[s1.to_usize()] == Square::DDIAG[s2.to_usize()]
     }
 
-
+    #[cfg(not(feature = "diagmath"))]
     #[inline(always)]
     pub(crate)const fn is_same_adiag(s1: Square, s2: Square) -> bool {
         Square::ADIAG[s1.to_usize()] == Square::ADIAG[s2.to_usize()]
     }
     
+    #[cfg(feature = "rowcolmath")]
     #[inline(always)]
     pub(crate)const fn is_same_row(s1: Square, s2: Square) -> bool {
         s1.to_row_usize() == s2.to_row_usize()
     }
     
+    #[cfg(feature = "rowcolmath")]
     #[inline(always)]
     pub(crate) const fn is_same_col(s1: Square, s2: Square) -> bool {
         s1.to_col_usize() == s2.to_col_usize()
     }
 
-    //#[inline(always)]
-    //pub(crate) const fn _is_same_ddiag(s1: Square, s2: Square) -> bool {
-    //    (s1.to_row_usize().abs_diff(s2.to_row_usize())) == (s1.to_col_usize().abs_diff(s2.to_col_usize()))
-    //}
+    #[cfg(feature = "diagmath")]
+    #[inline(always)]
+    pub(crate) const fn _is_same_ddiag(s1: Square, s2: Square) -> bool {
+        (s1.to_row_usize().abs_diff(s2.to_row_usize())) == (s1.to_col_usize().abs_diff(s2.to_col_usize()))
+    }
     
-    //#[inline(always)]
-    //pub(crate) const fn _is_same_adiag(s1: Square, s2: Square) -> bool {
-    //    (s1.to_row_usize().abs_diff(s2.to_row_usize())) + (s1.to_col_usize().abs_diff(s2.to_col_usize())) == 0
-    //}
+    #[cfg(feature = "diagmath")]
+    #[inline(always)]
+    pub(crate) const fn _is_same_adiag(s1: Square, s2: Square) -> bool {
+        (s1.to_row_usize().abs_diff(s2.to_row_usize())) + (s1.to_col_usize().abs_diff(s2.to_col_usize())) == 0
+    }
     
-    //#[inline(always)]
-    //pub(crate) const fn is_same_row(s1: Square, s2: Square) -> bool {
-    //    Square::ROWS[s1.to_usize()] == Square::ROWS[s2.to_usize()]
-    //}
+    #[cfg(not(feature = "rowcolmath"))]
+    #[inline(always)]
+    pub(crate) const fn is_same_row(s1: Square, s2: Square) -> bool {
+        Square::ROWS[s1.to_usize()] == Square::ROWS[s2.to_usize()]
+    }
     
-    //#[inline(always)]
-    //pub(crate) const fn is_same_col(s1: Square, s2: Square) -> bool {
-    //    Square::COLS[s1.to_usize()] == Square::COLS[s2.to_usize()]
-    //}
+    #[cfg(not(feature = "rowcolmath"))]
+    #[inline(always)]
+    pub(crate) const fn is_same_col(s1: Square, s2: Square) -> bool {
+        Square::COLS[s1.to_usize()] == Square::COLS[s2.to_usize()]
+    }
     
     #[rustfmt::skip]
     const DDIAG: [u8; 64] = [

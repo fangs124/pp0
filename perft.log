@@ -19,22 +19,40 @@ total positions: 21282919337, time: 370491ms
 speed: 57.45Mnps <-- latest perft, non-bulk with cozy-chess tech + SmallVec<[ChessMove,64]>
 total positions: 21282919337, time: 321956ms
 speed: 66.10Mnps <-- new baseline perft going forward. Removed zobrist_table keep up for perft. Has cozy-chess tech + vanilla Vec and other clean up
-total positions: 21282919337, time: 315344ms
+total positions: 21282919337, time: 315344ms <-- 5min 15.344s
 speed: 67.49Mnps <-- non-bulk with ArrayVec<ChessMove,218>
 
-==== [[6 piece + 2 colour bitboard]] ==== <-- new code
-total positions: 21282919337, time: 377482ms
-speed: 56.38Mnps
-
-========= [[12 piece bitboard]] ========= <-- new code
-total positions: 21282919337, time: 346335ms
-speed: 61.45Mnps
+=================== [[ old code ]] =================
+total positions: 16675713789, time: 260147ms
+speed: 64.10Mnps
 
 ========= [[6 piece + 2 colour bitboardd]] ========= diag array, row/col array
-total positions: 21282919337, time: 323835ms
-speed: 65.72Mnps
 ========= [[6 piece + 2 colour bitboardd]] ========= diag array, row/col maths
-total positions: 21282919337, time: 314834ms
-speed: 67.60Mnps
-
 ============== [[12 piece bitboard]] =============== diag array, row/col maths
+
+
+============== [[12 piece bitboard]] =============== diag array, row/col maths, no kingless_attack_mask
+total positions: 16675713789, time: 258694ms
+speed: 64.46Mnps
+
+============== [[12 piece bitboard]] =============== diag array, row/col maths, no kingless_attack_mask, maybemailbox
+total positions: 16675713789, time: 262289ms
+speed: 63.58Mnps
+
+============== [[12 piece bitboard]] =============== diag array, row/col maths, kingless_attack_mask
+total positions: 16675713789, time: 268729ms
+speed: 62.05Mnps
+
+========= [[6 piece + 2 colour bitboardd]] ========= diag array, row/col maths, no kingless_attack_mask
+total positions: 16675713789, time: 266132ms
+speed: 62.66Mnps
+
+========= [[6 piece + 2 colour bitboardd]] ========= diag array, row/col maths, no kingless_attack_mask, maybemailbox
+total positions: 16675713789, time: 254408ms
+speed: 65.55Mnps
+
+========= [[6 piece + 2 colour bitboardd]] ========= diag array, row/col maths, kingless_attack_mask
+total positions: 16675713789, time: 268761ms
+speed: 62.05Mnps
+
+
