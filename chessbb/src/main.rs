@@ -12,13 +12,16 @@ extern crate chessbb;
 fn main() {
     let is_bulk = false;
     perft_suite(None, is_bulk);
-    //let fen = "k7/8/8/7p/6P1/8/8/K7 w - - 0 1";
-    //let raw_moves: Vec<u16> = vec![2526];
-    //perft_test(fen, raw_moves, is_bulk);
+    //let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    //let raw_moves: Vec<u16> = vec![1032, 2096, 1609];
+    //perft_test(fen, raw_moves, true);
 }
-const START_DEPTH: usize = 2;
-const MAX_DEPTH: usize = 2;
+
+const MARCEL: bool = false;
+const START_DEPTH: usize = 1;
+const MAX_DEPTH: usize = 1;
 const PANIC_ON_ERROR: bool = true;
+
 fn perft_test(fen: &str, raw_moves: Vec<u16>, is_bulk: bool) {
     println!("\n============== history ===============");
     println!("fen: {fen}");
@@ -42,9 +45,13 @@ fn perft_test(fen: &str, raw_moves: Vec<u16>, is_bulk: bool) {
             let mut s = chess_move.print_move();
             let mut new_chessboard = chessboard.clone();
             new_chessboard.update_state(&chess_move);
-            let branch_total: u64 = new_chessboard.perft_count(depth - 1, is_bulk);
+            let branch_total: u64 = match is_bulk {
+                true => new_chessboard.perft_count_bulk(depth - 1),
+                false => new_chessboard.perft_count(depth - 1),
+            };
+
             total_count += branch_total;
-            s.push_str(format!(" - {:<6}", branch_total).as_str());
+            s.push_str(format!(" - {:<8}", branch_total).as_str());
             s.push_str(format!(" - data: {}", chess_move.data()).as_str());
             result_str_vec.push(s);
         }
@@ -60,7 +67,10 @@ fn perft_test(fen: &str, raw_moves: Vec<u16>, is_bulk: bool) {
 
 fn perft_suite(skip_to: Option<usize>, is_bulk: bool) {
     let mut node_count: u64 = 0;
-    let path = Path::new("standard.epd");
+    let path = match MARCEL {
+        true => Path::new("marcel.epd"),
+        false => Path::new("standard.epd"),
+    };
     let display = path.display();
 
     let mut file = match File::open(&path) {

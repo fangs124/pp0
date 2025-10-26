@@ -1,9 +1,14 @@
-#[macro_use]
-mod chesspiece;
+#[cfg(feature = "mimalloc")]
+use mimalloc::MiMalloc;
+
+#[cfg(feature = "mimalloc")]
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 mod bitboard;
 mod chessboard;
 mod chessmove;
+mod chesspiece;
 mod square;
 
 /* re-export */

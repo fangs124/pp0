@@ -161,7 +161,7 @@ impl ZobristHash {
 
     pub(super) const fn enpassant_hash(enpassant_bb: Bitboard) -> ZobristHash {
         //this function assumes there is only at most one non-zero bit in enpassant_bb
-        debug_assert!(enpassant_bb.count_ones() == 1);
+        debug_assert!(enpassant_bb.count_ones() <= 1);
         return ZobristHash(match enpassant_bb.lsb_square() {
             Some(square) => ENPASSANT_COL_HASH[square.to_col_usize()],
             None => 0,

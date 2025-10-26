@@ -1,14 +1,14 @@
 use std::{fmt::Debug, ops::Index};
 
 use crate::{
-    Bitboard, ChessPiece,
+    Bitboard, ChessPiece, Side,
     chessboard::{COLOUR_LABELS, PIECE_LABELS},
     square::Square,
 };
 
 //Pawn, Knight, Bishop Rook, Queen, King
 //White, Black
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub(crate) struct PieceColourBoard {
     pub(crate) piece: [Bitboard; 6],
     pub(crate) colour: [Bitboard; 2],
@@ -62,6 +62,10 @@ impl PieceColourBoard {
         self.colour[1]
     }
 
+    pub(crate) const fn colour_bitboard(&self, side: Side) -> Bitboard {
+        self.colour[side as usize]
+    }
+
     pub(crate) const fn blockers(&self) -> Bitboard {
         self.colour[0].bit_or(&self.colour[1])
     }
@@ -79,7 +83,7 @@ impl PieceColourBoard {
 
 // pieces: white pawn, white knight, white bishop, white rook, white queen, white king,
 //         black pawn, black knight, black bishop, black rook, black queen, black king,
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) struct PieceBoard([Bitboard; 12]);
 impl Index<ChessPiece> for PieceBoard {
     type Output = Bitboard;
@@ -111,6 +115,12 @@ impl PieceBoard {
         self.0[((index.0 as usize) * 6) + (index.1 as usize)]
     }
 
+    pub(crate) const fn colour_bitboard(&self, side: Side) -> Bitboard {
+        match side {
+            Side::White => self.white_blockers(),
+            Side::Black => self.black_blockers(),
+        }
+    }
     pub(crate) const fn white_blockers(&self) -> Bitboard {
         self.0[0].bit_or(&self.0[1]).bit_or(&self.0[2]).bit_or(&self.0[3]).bit_or(&self.0[4]).bit_or(&self.0[5])
     }

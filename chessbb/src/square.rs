@@ -162,30 +162,37 @@ impl Square {
         0, 1, 2, 3, 4, 5, 6, 7,
     ];
 
+    #[inline(always)]
     pub const fn left(&self) -> Square {
         Square::SQUARES[(*self as usize) - 1]
     }
 
+    #[inline(always)]
     pub const fn right(&self) -> Square {
         Square::SQUARES[(*self as usize) + 1]
     }
 
+    #[inline(always)]
     pub const fn up(&self) -> Square {
         Square::SQUARES[(*self as usize) + 8]
     }
 
+    #[inline(always)]
     pub const fn down(&self) -> Square {
         Square::SQUARES[(*self as usize) - 8]
     }
 
+    #[inline(always)]
     pub const fn upup(&self) -> Square {
         Square::SQUARES[(*self as usize) + 16]
     }
 
+    #[inline(always)]
     pub const fn downdown(&self) -> Square {
         Square::SQUARES[(*self as usize) - 16]
     }
 
+    #[inline(always)]
     pub const fn nth(n: usize) -> Square {
         Square::SQUARES[n]
     }
@@ -255,4 +262,5 @@ impl Square {
         "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7", //
         "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8", //
     ];
+    
 }

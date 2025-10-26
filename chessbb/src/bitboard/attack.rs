@@ -26,7 +26,7 @@ const BISHOP_ATTACKS: [Bitboard; 64] = init_bishop_attack();
 const ROOK_ATTACKS: [Bitboard; 64] = init_rook_attack();
 
 #[inline(always)]
-pub(crate) const fn get_pawn_attack(square: Square, side: Side) -> Bitboard {
+pub(crate) const fn get_pawn_attack(side: Side, square: Square) -> Bitboard {
     match side {
         Side::White => W_PAWN_ATTACKS[square.to_usize()],
         Side::Black => B_PAWN_ATTACKS[square.to_usize()],

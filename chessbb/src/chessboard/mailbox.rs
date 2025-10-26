@@ -74,7 +74,7 @@ struct MaybeChessPiece(u8);
 //    }
 //}
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub(crate) struct MaybeMailbox([MaybeChessPiece; 64]);
 
 impl From<Option<ChessPiece>> for MaybeChessPiece {
@@ -149,8 +149,12 @@ impl Debug for MaybeMailbox {
 }
 
 impl MaybeMailbox {
-    pub(crate) const fn square_index(&self, index: Square) -> Option<ChessPiece> {
-        MaybeChessPiece::convert(self.0[index as usize])
+    pub(crate) const fn square_index(&self, s: Square) -> Option<ChessPiece> {
+        MaybeChessPiece::convert(self.0[s as usize])
+    }
+
+    pub(crate) const fn index(&self, i: usize) -> Option<ChessPiece> {
+        MaybeChessPiece::convert(self.0[i])
     }
 
     pub(crate) fn set(&mut self, piece: Option<ChessPiece>, square: Square) {
@@ -219,8 +223,12 @@ impl Index<Square> for OptionMailbox {
 }
 
 impl OptionMailbox {
-    pub const fn square_index(&self, index: Square) -> Option<ChessPiece> {
-        self.0[index as usize]
+    pub const fn square_index(&self, s: Square) -> Option<ChessPiece> {
+        self.0[s as usize]
+    }
+
+    pub(crate) const fn index(&self, i: usize) -> Option<ChessPiece> {
+        self.0[i]
     }
 
     pub(crate) const fn set(&mut self, piece: Option<ChessPiece>, square: Square) {
