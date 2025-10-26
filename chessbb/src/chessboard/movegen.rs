@@ -370,7 +370,7 @@ impl ChessBoard {
         let enemies = self.bitboards.colour_blockers(enemy_side);
         let king_square = self.king_square(side);
         for source in pawns & !pinned {
-            let targets = (get_pawn_quiet(side, source, &blockers) | (get_pawn_attack(side, source) & enemies)) & *target_squares;
+            let targets = (get_pawn_quiedddt(side, source, &blockers) | (get_pawn_attack(side, source) & enemies)) & *target_squares;
             ChessMove::add_pawn_moves(source, targets, moves);
         }
 

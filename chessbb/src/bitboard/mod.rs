@@ -40,13 +40,42 @@ impl std::fmt::Display for Bitboard {
     }
 }
 
+// taken from cozy-chess
+
+impl Iterator for Bitboard {
+    type Item = Square;
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        let square = self.lsb_square();
+        if let Some(_) = square {
+            self.pop_lsb();
+        }
+        square
+    }
+
+    #[inline(always)]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.count_ones() as usize, Some(self.count_ones() as usize))
+    }
+}
+
+impl ExactSizeIterator for Bitboard {
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.0.count_ones() as usize
+    }
+}
+
 impl Bitboard {
     pub(crate) const ZERO: Bitboard = Bitboard(0u64);
     pub(crate) const ONES: Bitboard = Bitboard(u64::MAX);
 
     pub(crate) const NOT_A_FILE: Bitboard = Bitboard(0b01111111_01111111_01111111_01111111_01111111_01111111_01111111_01111111);
     pub(crate) const NOT_H_FILE: Bitboard = Bitboard(0b11111110_11111110_11111110_11111110_11111110_11111110_11111110_11111110);
-
+    pub(crate) const NOT_PROMOTION_SQUARES: Bitboard = Bitboard(0b00000000_11111111_11111111_11111111_11111111_11111111_11111111_00000000);
+    pub(crate) const PROMOTION_SQUARES: Bitboard = Bitboard(0b11111111_00000000_00000000_00000000_00000000_00000000_00000000_11111111);
+    
     pub(crate) const ROWS: [Bitboard; 8] = [
         Bitboard(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_11111111),
         Bitboard(0b00000000_00000000_00000000_00000000_00000000_00000000_11111111_00000000),
@@ -95,6 +124,11 @@ impl Bitboard {
     #[inline(always)]
     pub(crate) const fn set_bit(&mut self, square: Square) {
         self.0 |= 1u64 << square.to_usize();
+    }
+
+    #[inline(always)]
+    pub(crate) const fn flip_bit(&mut self, square: Square) {
+        self.0 ^= 1u64 << square.to_usize();
     }
 
     #[inline(always)]

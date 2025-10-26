@@ -62,7 +62,7 @@ impl PieceColourBoard {
         self.colour[1]
     }
 
-    pub(crate) const fn colour_bitboard(&self, side: Side) -> Bitboard {
+    pub(crate) const fn colour_blockers(&self, side: Side) -> Bitboard {
         self.colour[side as usize]
     }
 
@@ -115,7 +115,7 @@ impl PieceBoard {
         self.0[((index.0 as usize) * 6) + (index.1 as usize)]
     }
 
-    pub(crate) const fn colour_bitboard(&self, side: Side) -> Bitboard {
+    pub(crate) const fn colour_blockers(&self, side: Side) -> Bitboard {
         match side {
             Side::White => self.white_blockers(),
             Side::Black => self.black_blockers(),

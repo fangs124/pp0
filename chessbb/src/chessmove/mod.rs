@@ -4,6 +4,7 @@ use std::num::NonZero;
 use crate::PieceType;
 use crate::Side;
 use crate::bitboard::*;
+use crate::chessboard::MoveList;
 use crate::square::Square;
 
 /* indexing the 64-squares:
@@ -157,11 +158,49 @@ impl ChessMove {
         self.data.get()
     }
 
+    //TODO: make this const when able
+    pub fn add_normal_moves(s: Square, ts: Bitboard, moves: &mut MoveList) {
+        let mut ts = ts;
+        let base_data: u16 = (s.to_usize() & 0b111111) as u16;
+        while ts.is_not_zero() {
+            let t = ts.lsb_square().unwrap();
+            let data: u16 = base_data | ((t.to_usize() << 6) & 0b111111_000000) as u16;
+            moves.push(ChessMove { data: NonZero::new(data).expect("a legal move can not have zero bit-pattern.") });
+            ts.pop_lsb();
+        }
+    }
+
+    //TODO: make this const when able
+    pub fn add_pawn_moves(s: Square, ts: Bitboard, moves: &mut MoveList) {
+        let mut ts_normal = ts & Bitboard::NOT_PROMOTION_SQUARES;
+        let mut ts_promotion = ts & Bitboard::PROMOTION_SQUARES;
+        let base_data: u16 = (s.to_usize() & 0b111111) as u16;
+
+        while ts_normal.is_not_zero() {
+            let t = ts_normal.lsb_square().unwrap();
+            let data: u16 = base_data | ((t.to_usize() << 6) & 0b111111_000000) as u16;
+            moves.push(ChessMove { data: NonZero::new(data).expect("a legal move can not have zero bit-pattern.") });
+            ts_normal.pop_lsb();
+        }
+
+        while ts_promotion.is_not_zero() {
+            let t = ts_promotion.lsb_square().unwrap();
+            #[cfg(feature = "arrayvec")]
+            //safe because: https://lichess.org/@/Tobs40/blog/why-a-position-cant-have-more-than-218-moves/a5xdxeqs
+            unsafe {
+                moves.try_extend_from_slice(&ChessMove::promotions(s, t)).unwrap_unchecked()
+            };
+            #[cfg(not(any(feature = "arrayvec")))]
+            moves.extend_from_slice(&ChessMove::promotions(source, target));
+            ts_promotion.pop_lsb();
+        }
+    }
+
     pub const fn new(s: Square, t: Square, m: MoveType) -> Self {
         // can't promote to king/pawn
         // ps: !matches!(...) is ugly
-        assert!(matches!(m, MoveType::Promotion(PieceType::King)) == false);
-        assert!(matches!(m, MoveType::Promotion(PieceType::Pawn)) == false);
+        debug_assert!(matches!(m, MoveType::Promotion(PieceType::King)) == false);
+        debug_assert!(matches!(m, MoveType::Promotion(PieceType::Pawn)) == false);
         let mut data: u16 = ((s.to_usize() & 0b111111) | ((t.to_usize() << 6) & 0b111111_000000)) as u16;
 
         let move_type_data: usize = match m {
@@ -191,6 +230,17 @@ impl ChessMove {
         ];
     }
 
+    #[inline(always)]
+    pub(crate) const fn kingside_castle(side: Side) -> ChessMove {
+        ChessMove::KINGSIDE_CASTLE_MOVES[side as usize]
+    }
+
+    #[inline(always)]
+    pub(crate) const fn queenside_castle(side: Side) -> ChessMove {
+        ChessMove::QUEENSIDE_CASTLE_MOVES[side as usize]
+    }
+    const KINGSIDE_CASTLE_MOVES: [ChessMove; 2] = [ChessMove::W_KINGSIDE_CASTLE, ChessMove::B_KINGSIDE_CASTLE];
+    const QUEENSIDE_CASTLE_MOVES: [ChessMove; 2] = [ChessMove::W_QUEENSIDE_CASTLE, ChessMove::B_QUEENSIDE_CASTLE];
     pub(crate) const W_KINGSIDE_CASTLE: ChessMove =
         ChessMove::new(Square::W_KING_SQUARE, Square::W_KINGSIDE_CASTLE_SQUARE, MoveType::Castle(Castling::Kingside(Side::White)));
 

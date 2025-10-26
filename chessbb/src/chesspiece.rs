@@ -1,11 +1,16 @@
 use std::slice;
 
+use crate::{
+    Bitboard,
+    bitboard::attack::{get_bishop_attack, get_queen_attack, get_rook_attack},
+    square::Square,
+};
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Side {
     White = 0,
     Black = 1,
 }
-
 #[rustfmt::skip]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PieceType {
@@ -15,6 +20,30 @@ pub enum PieceType {
     Rook   = 3,
     Queen  = 4,
     King   = 5,
+}
+
+#[rustfmt::skip]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SliderType { //this seems like an ugly hack
+    Bishop = 2,
+    Rook   = 3,
+    Queen  = 4,
+}
+
+impl From<SliderType> for PieceType {
+    fn from(value: SliderType) -> PieceType {
+        PieceType::PIECES[value as usize]
+    }
+}
+
+impl SliderType {
+    pub(crate) fn get_attack(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        match self {
+            SliderType::Bishop => get_bishop_attack(square, blockers),
+            SliderType::Rook => get_rook_attack(square, blockers),
+            SliderType::Queen => get_queen_attack(square, blockers),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -57,7 +86,7 @@ impl TryFrom<char> for ChessPiece {
 }
 
 impl PieceType {
-    const PIECES: [PieceType; 6] = [PieceType::King, PieceType::Queen, PieceType::Knight, PieceType::Bishop, PieceType::Rook, PieceType::Pawn];
+    const PIECES: [PieceType; 6] = [PieceType::Pawn, PieceType::Knight, PieceType::Bishop, PieceType::Rook, PieceType::Queen, PieceType::King];
 
     pub fn iter() -> slice::Iter<'static, PieceType> {
         PieceType::PIECES.iter()

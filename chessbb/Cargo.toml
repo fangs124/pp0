@@ -9,6 +9,7 @@ arrayvec = {version = "0.7.6", optional = true}
 smallvec = {version = "1.15.*", features = [
     "const_generics",
 ], optional = true}
+#subenum = "1.1.*"
 
 [features]
 default = [

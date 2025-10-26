@@ -10,14 +10,14 @@ use std::time::Instant;
 
 extern crate chessbb;
 fn main() {
-    let is_bulk = false;
+    let is_bulk = true;
     perft_suite(None, is_bulk);
-    //let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    //let raw_moves: Vec<u16> = vec![1032, 2096, 1609];
+    //let fen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1";
+    //let raw_moves: Vec<u16> = vec![89, 1951, 321, 2398, 1804];
     //perft_test(fen, raw_moves, true);
 }
 
-const MARCEL: bool = false;
+const MARCEL: bool = true;
 const START_DEPTH: usize = 1;
 const MAX_DEPTH: usize = 1;
 const PANIC_ON_ERROR: bool = true;
