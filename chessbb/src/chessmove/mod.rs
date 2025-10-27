@@ -80,7 +80,7 @@ impl LexiOrd for ChessMove {
 //}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) enum MoveType {
+pub enum MoveType {
     Normal,
     Castle(Castling),
     EnPassant,
@@ -88,7 +88,7 @@ pub(crate) enum MoveType {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) enum Castling {
+pub enum Castling {
     Kingside(Side),
     Queenside(Side),
 }
@@ -103,6 +103,10 @@ impl ChessMove {
     pub(crate) const fn target(&self) -> Square {
         Square::nth(((self.data.get() & 0b111111_000000u16) >> 6) as usize)
     }
+
+    const PROMOTION_PIECE: [PieceType; 4] = [PieceType::Knight, PieceType::Bishop, PieceType::Rook, PieceType::Queen];
+    const CASTLING: [Castling; 4] =
+        [Castling::Kingside(Side::White), Castling::Queenside(Side::White), Castling::Kingside(Side::Black), Castling::Queenside(Side::Black)];
 
     pub(crate) const fn move_type(&self) -> MoveType {
         let piece: PieceType = match ((self.data.get() & 0b11_000000_000000u16) as usize) >> 12 {
@@ -129,6 +133,17 @@ impl ChessMove {
             _ => unreachable!(),
         }
     }
+    //pub(crate) const fn move_type(&self) -> MoveType {
+    //    let index = ((self.data.get() & 0b11_000000_000000u16) as usize) >> 12;
+    //
+    //    match ((self.data.get() & 0b11_00_000000_000000) as usize) >> 14 {
+    //        0 => MoveType::Normal,
+    //        1 => MoveType::Castle(ChessMove::CASTLING[index]),
+    //        2 => MoveType::EnPassant,
+    //        3 => MoveType::Promotion(ChessMove::PROMOTION_PIECE[index]),
+    //        _ => unreachable!(),
+    //    }
+    //}
 
     #[inline(always)]
     pub(crate) const fn set_source(&mut self, index: usize) {

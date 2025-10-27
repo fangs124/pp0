@@ -177,7 +177,7 @@ impl ChessBoard {
                     Castling::Kingside(Side::Black) => (ChessPiece::BR, Square::B_KINGSIDE_ROOK_SQ_SOURCE, Square::B_KINGSIDE_ROOK_SQ_TARGET),
                     Castling::Queenside(Side::Black) => (ChessPiece::BR, Square::B_QUEENSIDE_ROOK_SQ_SOURCE, Square::B_QUEENSIDE_ROOK_SQ_TARGET),
                 };
-                assert!(self.bitboards.piece_bitboard(piece).nth_is_not_zero(rook_square_source));
+                debug_assert!(self.bitboards.piece_bitboard(piece).nth_is_not_zero(rook_square_source));
                 self.bitboards.pop_bit(piece, rook_square_source);
                 self.bitboards.set_bit(piece, rook_square_target);
                 self.mailbox.set(None, rook_square_source);
@@ -314,7 +314,6 @@ impl ChessBoard {
             }
             attackers.pop_lsb();
         }
-        //compute check_bb and check_mask for knight
 
         if self.data.side_to_move == Side::Black {
             self.data.full_move_counter += 1;

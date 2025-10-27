@@ -79,8 +79,8 @@ pub(crate) struct ChessData {
     pinned_bb: Bitboard,     //pieces that are pinned
     pinner_bb: Bitboard,     //pieces doing the pin
     side_to_move: Side,
-    full_move_counter: u16,
-    fifty_move_rule_counter: u16,
+    full_move_counter: u16, //engine games can go over 400 moves, u8::MAX is 255
+    fifty_move_rule_counter: u8,
     zobrist_hash: ZobristHash,
     //zt
 }

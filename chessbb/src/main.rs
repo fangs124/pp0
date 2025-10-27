@@ -17,7 +17,7 @@ fn main() {
     //perft_test(fen, raw_moves, true);
 }
 
-//NOTE: tested marcel until 3400
+//NOTE: tested marcel until ~3400
 const MARCEL: bool = false;
 const START_DEPTH: usize = 1;
 const MAX_DEPTH: usize = 1;
@@ -65,6 +65,11 @@ fn perft_test(fen: &str, raw_moves: Vec<u16>, is_bulk: bool) {
 
 fn perft_suite(skip_to: Option<usize>, is_bulk: bool) {
     let mut node_count: u64 = 0;
+    //cozy-chess with mailbox is 168 bytes
+    //cozy-chess without mailbox is 104 bytes
+    //ChessBoard is currently 184 bytes
+    const SIZE: usize = size_of::<ChessBoard>();
+    //println!("\nboard has size of: {} bytes", SIZE);
     let path = match MARCEL {
         true => Path::new("marcel.epd"),
         false => Path::new("standard.epd"),
@@ -94,7 +99,6 @@ fn perft_suite(skip_to: Option<usize>, is_bulk: bool) {
 
         if skip_to.map_or(false, |x| num != x) {
             continue;
-            
         }
         let chessboard = ChessBoard::from_fen(start_fen);
         println!("\n========= position number {:<3} =========", num);

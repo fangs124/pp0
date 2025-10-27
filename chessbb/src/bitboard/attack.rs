@@ -117,8 +117,8 @@ pub(crate) const fn rays(i: Square, j: Square) -> Bitboard {
 pub(crate) const fn long_rays(i: Square, j: Square) -> Bitboard {
     LONG_RAYS[i as usize][j as usize]
 }
-static RAYS: [[Bitboard; 64]; 64] = init_rays();
-static LONG_RAYS: [[Bitboard; 64]; 64] = init_long_rays();
+const RAYS: [[Bitboard; 64]; 64] = init_rays();
+const LONG_RAYS: [[Bitboard; 64]; 64] = init_long_rays();
 
 const fn init_rays() -> [[Bitboard; 64]; 64] {
     let mut rays: [[Bitboard; 64]; 64] = [[Bitboard::ZERO; 64]; 64];

@@ -16,6 +16,19 @@
 
 use std::fmt::Display;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Column {
+    A, B, C, D, E, F, G, H
+}
+
+impl Column {
+    const COLUMNS: [Column; 8] = [Column::A, Column::B, Column:: C, Column::D, Column::E, Column::F, Column::G, Column::H];
+
+    pub const fn nth(index: usize) -> Column{
+        Column::COLUMNS[index]
+    }
+}
+
 #[rustfmt::skip]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Square {
@@ -49,6 +62,11 @@ impl Square {
     #[inline(always)]
     pub const fn to_col_usize(&self) -> usize {
         (*self as usize) % 8
+    }
+
+    #[inline(always)]
+    pub const fn to_col(&self) -> Column {
+        Column::COLUMNS[(*self as usize) % 8]
     }
 
     #[inline(always)]

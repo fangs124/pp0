@@ -66,7 +66,7 @@ impl ChessBoard {
         }
 
         //parse fifty-move-rule counter
-        let fifty_move_rule_counter = input.next().map_or(0, |x| x.parse::<u16>().expect("from_fen error: invalid fifty-move-rule token"));
+        let fifty_move_rule_counter = input.next().map_or(0, |x| x.parse::<u8>().expect("from_fen error: invalid fifty-move-rule token"));
 
         //parse fullmove number
         let full_move_counter = input.next().map_or(0, |x| x.parse::<u16>().expect("from_fen error: invalid move-counter token"));
