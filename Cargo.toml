@@ -3,7 +3,7 @@ resolver = "3"
 members  = [ "chessbb", "nnet", "pp0" ]
 
 [profile.dev]
-opt-level = 2
+opt-level = 1
 
 [profile.release]
 #strip           = "symbols"

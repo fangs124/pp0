@@ -10,14 +10,15 @@ use std::time::Instant;
 
 extern crate chessbb;
 fn main() {
-    let is_bulk = true;
+    let is_bulk = false;
     perft_suite(None, is_bulk);
     //let fen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1";
     //let raw_moves: Vec<u16> = vec![89, 1951, 321, 2398, 1804];
     //perft_test(fen, raw_moves, true);
 }
 
-const MARCEL: bool = true;
+//NOTE: tested marcel until 3400
+const MARCEL: bool = false;
 const START_DEPTH: usize = 1;
 const MAX_DEPTH: usize = 1;
 const PANIC_ON_ERROR: bool = true;
@@ -27,13 +28,13 @@ fn perft_test(fen: &str, raw_moves: Vec<u16>, is_bulk: bool) {
     println!("fen: {fen}");
     let mut chessboard = ChessBoard::from_fen(fen);
     for data in raw_moves {
-        println!("{}", chessboard.print_board());
+        println!("{}", chessboard);
         chessboard.update_state(&ChessMove::from_raw(data));
     }
 
     println!("\n============== position ==============");
-    println!("{}", chessboard.print_board());
-    println!("{}", chessboard.print_board_debug());
+    println!("{}", chessboard);
+    println!("{:?}", chessboard);
     println!("======================================\n");
     let mut depth = START_DEPTH;
     let mut moves = chessboard.generate_moves();
@@ -45,10 +46,7 @@ fn perft_test(fen: &str, raw_moves: Vec<u16>, is_bulk: bool) {
             let mut s = chess_move.print_move();
             let mut new_chessboard = chessboard.clone();
             new_chessboard.update_state(&chess_move);
-            let branch_total: u64 = match is_bulk {
-                true => new_chessboard.perft_count_bulk(depth - 1),
-                false => new_chessboard.perft_count(depth - 1),
-            };
+            let branch_total: u64 = new_chessboard.perft_count(depth, is_bulk);
 
             total_count += branch_total;
             s.push_str(format!(" - {:<8}", branch_total).as_str());
@@ -81,8 +79,9 @@ fn perft_suite(skip_to: Option<usize>, is_bulk: bool) {
     let mut s = String::new();
     match file.read_to_string(&mut s) {
         Err(why) => panic!("couldn't read {}: {}", display, why),
-        Ok(_) => print!("{} contains:\n{}", display, s),
+        Ok(_) => print!("{} contains:\n{}\n", display, s),
     }
+
     let lines: Vec<&str> = s.split('\n').collect();
     let mut num: usize = 0;
     let mut elapsed_total: Duration = Duration::new(0, 0);
@@ -92,16 +91,16 @@ fn perft_suite(skip_to: Option<usize>, is_bulk: bool) {
 
         let start_fen = sections.next().unwrap();
         num += 1;
-        if skip_to.is_some() {
-            if num != skip_to.unwrap() {
-                continue;
-            }
+
+        if skip_to.map_or(false, |x| num != x) {
+            continue;
+            
         }
         let chessboard = ChessBoard::from_fen(start_fen);
         println!("\n========= position number {:<3} =========", num);
         println!("fen: {start_fen}");
         println!("=======================================\n");
-        println!("{}", chessboard.print_board());
+        println!("{}", chessboard);
         //println!("{}", chessboard.print_board_debug());
 
         for section in sections {
@@ -120,7 +119,6 @@ fn perft_suite(skip_to: Option<usize>, is_bulk: bool) {
             println!("depth: {depth}, result_count: {result_count}, total_count: {total_count}, {result_str}");
             if result_str == "Error!" {
                 has_error = true;
-                println!("");
                 if PANIC_ON_ERROR {
                     panic!("fen:{}, depth: {}", section, depth);
                 }

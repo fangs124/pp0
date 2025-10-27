@@ -94,14 +94,6 @@ pub(crate) enum Castling {
 }
 
 impl ChessMove {
-    //pub fn print_move(&self) -> String {
-    //    if let MoveType::Promotion(piece) = self.move_type() {
-    //        return format!("{}{}{}", SQUARE_SYM[self.source().to_usize()], SQUARE_SYM[self.target().to_usize()], piece.to_uci_char());
-    //    } else {
-    //        return format!("{}{}", SQUARE_SYM[self.source().to_usize()], SQUARE_SYM[self.target().to_usize()]);
-    //    }
-    //}
-
     #[inline(always)]
     pub(crate) const fn source(&self) -> Square {
         Square::nth((self.data.get() & 0b000000_111111u16) as usize)
@@ -222,12 +214,12 @@ impl ChessMove {
     }
 
     pub(crate) const fn promotions(source: Square, target: Square) -> [ChessMove; 4] {
-        return [
+        [
             ChessMove::new(source, target, MoveType::Promotion(PieceType::Queen)),
             ChessMove::new(source, target, MoveType::Promotion(PieceType::Knight)),
             ChessMove::new(source, target, MoveType::Promotion(PieceType::Bishop)),
             ChessMove::new(source, target, MoveType::Promotion(PieceType::Rook)),
-        ];
+        ]
     }
 
     #[inline(always)]
@@ -255,9 +247,9 @@ impl ChessMove {
 
     pub fn print_move(&self) -> String {
         if let MoveType::Promotion(piece) = self.move_type() {
-            return format!("{}{}{}", self.source(), self.target(), piece.to_uci_char());
+            format!("{}{}{}", self.source(), self.target(), piece.to_uci_char())
         } else {
-            return format!("{}{}", self.source(), self.target());
+            format!("{}{}", self.source(), self.target())
         }
     }
 }

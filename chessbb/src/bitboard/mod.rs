@@ -21,15 +21,6 @@ pub struct Bitboard(u64);
     A  B  C  D  E  F  G  H */
 
 impl std::fmt::Display for Bitboard {
-    //fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    //    let mut s = String::new();
-    //    for i in 0..8u64 {
-    //        s.push_str(&format!("{:08b}", (self.0 & (0xFFu64 << (8 * (7 - i)))) >> (8 * (7 - i))));
-    //        s.push('\n');
-    //    }
-    //    write!(f, "{s}")
-    //}
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = String::new();
         for i in 0..8u64 {

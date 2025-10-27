@@ -92,13 +92,13 @@ impl Square {
 
     #[cfg(feature = "diagmath")]
     #[inline(always)]
-    pub(crate) const fn _is_same_ddiag(s1: Square, s2: Square) -> bool {
+    pub(crate) const fn is_same_ddiag(s1: Square, s2: Square) -> bool {
         (s1.to_row_usize().abs_diff(s2.to_row_usize())) == (s1.to_col_usize().abs_diff(s2.to_col_usize()))
     }
     
     #[cfg(feature = "diagmath")]
     #[inline(always)]
-    pub(crate) const fn _is_same_adiag(s1: Square, s2: Square) -> bool {
+    pub(crate) const fn is_same_adiag(s1: Square, s2: Square) -> bool {
         (s1.to_row_usize().abs_diff(s2.to_row_usize())) + (s1.to_col_usize().abs_diff(s2.to_col_usize())) == 0
     }
     

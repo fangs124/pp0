@@ -175,7 +175,7 @@ impl MaybeMailbox {
     ]);
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub(crate) struct OptionMailbox([Option<ChessPiece>; 64]);
 
 #[rustfmt::skip]
