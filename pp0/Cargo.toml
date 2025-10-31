@@ -1,6 +1,19 @@
 [package]
-name = "pp0"
+name    = "pp0"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+nnue     = {path = "../nnue"}
+chessbb  = {path = "../chessbb", features = [ "bytemuck", "nnue" ]}
+serde    = {version = "1.0", features = [ "derive" ], optional = true}
+bytemuck = {version = "1.23", features = [ "derive" ]}
+atomic   = "0.6"
+arrayvec = {version = "0.7.6", optional = true}
+
+[features]
+# Defines a feature named `webp` that does not enable any other features.
+default         = [ "small_atomic_tt", "serde", "arrayvec" ]
+small_atomic_tt = [  ]
+serde           = [ "dep:serde" ]
+arrayvec        = [ "dep:arrayvec" ]

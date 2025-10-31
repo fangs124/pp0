@@ -1,4 +1,4 @@
-use std::{fmt::Debug, ops::Index};
+use std::{fmt::Debug, iter, ops::Index};
 
 use crate::{ChessPiece, PieceType, Side, square::Square};
 
@@ -37,10 +37,16 @@ macro_rules! maybe_cpt {
 }
 
 #[cfg(feature = "maybemailbox")]
-pub(crate) type Mailbox = MaybeMailbox;
+pub type Mailbox = MaybeMailbox;
+
+#[cfg(feature = "maybemailbox")]
+pub type MailboxIterator = MaybeMailboxIterator;
 
 #[cfg(not(feature = "maybemailbox"))]
-pub(crate) type Mailbox = OptionMailbox;
+pub type Mailbox = OptionMailbox;
+
+#[cfg(not(feature = "maybemailbox"))]
+pub type MailboxIterator = OptionMailboxIterator;
 
 /*  binary masks           description         hexidecimal masks
 0000 XXXX                  chess piece         0x15
@@ -75,7 +81,27 @@ struct MaybeChessPiece(u8);
 //}
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub(crate) struct MaybeMailbox([MaybeChessPiece; 64]);
+pub struct MaybeMailbox([MaybeChessPiece; 64]);
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct MaybeMailboxIterator {
+    index: usize,
+    mailbox: MaybeMailbox,
+}
+
+impl Iterator for MaybeMailboxIterator {
+    type Item = Option<ChessPiece>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index == 64 {
+            return None;
+        }
+        let piece: Option<ChessPiece> = self.mailbox.0[self.index].into();
+
+        self.index += 1;
+        Some(piece)
+    }
+}
 
 impl From<Option<ChessPiece>> for MaybeChessPiece {
     fn from(value: Option<ChessPiece>) -> MaybeChessPiece {
@@ -158,8 +184,13 @@ impl MaybeMailbox {
     }
 
     pub(crate) fn set(&mut self, piece: Option<ChessPiece>, square: Square) {
-        self.0[square.to_usize()] = MaybeChessPiece::from(piece);
+        self.0[square.as_usize()] = MaybeChessPiece::from(piece);
     }
+
+    pub fn iter(&self) -> MaybeMailboxIterator {
+        MaybeMailboxIterator { index: 0, mailbox: *self }
+    }
+
     pub(crate) const EMPTY_MAILBOX: MaybeMailbox = MaybeMailbox([MaybeChessPiece::NONE; 64]);
 
     #[rustfmt::skip]
@@ -176,7 +207,7 @@ impl MaybeMailbox {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub(crate) struct OptionMailbox([Option<ChessPiece>; 64]);
+pub struct OptionMailbox([Option<ChessPiece>; 64]);
 
 #[rustfmt::skip]
 impl Debug for OptionMailbox {
@@ -222,6 +253,26 @@ impl Index<Square> for OptionMailbox {
     }
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct OptionMailboxIterator {
+    index: usize,
+    mailbox: OptionMailbox,
+}
+
+impl Iterator for OptionMailboxIterator {
+    type Item = Option<ChessPiece>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index == 64 {
+            return None;
+        }
+        let piece: Option<ChessPiece> = self.mailbox.0[self.index];
+
+        self.index += 1;
+        Some(piece)
+    }
+}
+
 impl OptionMailbox {
     pub const fn square_index(&self, s: Square) -> Option<ChessPiece> {
         self.0[s as usize]
@@ -232,8 +283,13 @@ impl OptionMailbox {
     }
 
     pub(crate) const fn set(&mut self, piece: Option<ChessPiece>, square: Square) {
-        self.0[square.to_usize()] = piece;
+        self.0[square.as_usize()] = piece;
     }
+
+    pub fn iter(&self) -> OptionMailboxIterator {
+        OptionMailboxIterator { index: 0, mailbox: *self }
+    }
+
     pub(crate) const EMPTY_MAILBOX: OptionMailbox = OptionMailbox([None; 64]);
 
     #[rustfmt::skip]

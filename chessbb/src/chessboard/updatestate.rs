@@ -94,7 +94,7 @@ impl ChessBoard {
                 //if move is a 2-square pawn move, update enpassant bitboard
                 if self.is_pawn_move_enpassant_relevant(&source, &target) {
                     //FIXME should check if enpassant is even legal for enemy
-                    enpassant_bb.set_bit(Square::nth(target.to_usize() - 8));
+                    enpassant_bb.set_bit(Square::nth(target.as_usize() - 8));
                 }
                 check_bb = check_bb.bit_or(&get_b_pawn_attack(enm_king_square).bit_and(&Bitboard::nth(target)));
             }
@@ -106,7 +106,7 @@ impl ChessBoard {
                 //if move is a 2-square pawn move, update enpassant bitboard
                 if self.is_pawn_move_enpassant_relevant(&source, &target) {
                     //FIXME should check if enpassant is even legal for enemy
-                    enpassant_bb.set_bit(Square::nth(target.to_usize() + 8));
+                    enpassant_bb.set_bit(Square::nth(target.as_usize() + 8));
                 }
                 check_bb = check_bb.bit_or(&get_w_pawn_attack(enm_king_square).bit_and(&Bitboard::nth(target)));
             }
@@ -193,10 +193,10 @@ impl ChessBoard {
                 let enemy_piece: ChessPiece = ChessPiece(side.update(), PieceType::Pawn);
                 match self.data.side_to_move {
                     Side::White => {
-                        enemy_pawn_square = Square::nth(target.to_usize() - 8);
+                        enemy_pawn_square = Square::nth(target.as_usize() - 8);
                     }
                     Side::Black => {
-                        enemy_pawn_square = Square::nth(target.to_usize() + 8);
+                        enemy_pawn_square = Square::nth(target.as_usize() + 8);
                     }
                 }
 
@@ -343,14 +343,14 @@ impl ChessBoard {
     fn is_pawn_move_enpassant_relevant(&self, source: &Square, target: &Square) -> bool {
         match self.side() {
             Side::White => {
-                (source.to_usize() + 16 == target.to_usize())
-                    && ((matches!(self.mailbox.square_index(target.right()), Some(ChessPiece::BP)) && (source.to_col_usize() != 7))
-                        || matches!(self.mailbox.square_index(target.left()), Some(ChessPiece::BP)) && (source.to_col_usize() != 0))
+                (source.as_usize() + 16 == target.as_usize())
+                    && ((matches!(self.mailbox.square_index(target.right()), Some(ChessPiece::BP)) && (source.as_col_usize() != 7))
+                        || matches!(self.mailbox.square_index(target.left()), Some(ChessPiece::BP)) && (source.as_col_usize() != 0))
             }
             Side::Black => {
-                (source.to_usize() == target.to_usize() + 16)
-                    && (matches!(self.mailbox.square_index(target.right()), Some(ChessPiece::WP)) && (source.to_col_usize() != 7)
-                        || matches!(self.mailbox.square_index(target.left()), Some(ChessPiece::WP)) && (source.to_col_usize() != 0))
+                (source.as_usize() == target.as_usize() + 16)
+                    && (matches!(self.mailbox.square_index(target.right()), Some(ChessPiece::WP)) && (source.as_col_usize() != 7)
+                        || matches!(self.mailbox.square_index(target.left()), Some(ChessPiece::WP)) && (source.as_col_usize() != 0))
             }
         }
     }

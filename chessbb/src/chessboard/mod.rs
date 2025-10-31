@@ -24,7 +24,6 @@ use crate::chessboard::mailbox::Mailbox;
 use crate::chessboard::zobrist::{ZobristHash, ZobristTable};
 use crate::chessmove::Castling;
 use crate::chessmove::ChessMove;
-use crate::chessmove::MoveType;
 use crate::square::Square;
 
 mod fen;
@@ -33,7 +32,7 @@ mod movegen;
 mod perft;
 mod pieceboard;
 mod updatestate;
-mod zobrist;
+pub mod zobrist;
 
 #[cfg(feature = "arrayvec")]
 pub type MoveList = ArrayVec<ChessMove, SIZE>;
@@ -71,6 +70,18 @@ pub struct ChessGame {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum GameState {
+    Finished(GameResult),
+    Ongoing,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum GameResult {
+    Win(Side),
+    Draw,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) struct ChessData {
     castle_bools: [bool; 4], //WK, WQ, BK, BQ castle rights
     enpassant_bb: Bitboard,  //square attackable by enemy piece
@@ -103,7 +114,7 @@ impl Display for ChessBoard {
                 r.push('.');
             }
 
-            if square.to_usize() % 8 == 7 {
+            if square.as_usize() % 8 == 7 {
                 r.push('\n');
                 rows.push(r.clone());
                 r = String::new();
@@ -193,6 +204,56 @@ impl ChessGame {
         ChessGame { chessboard: ChessBoard::start_pos(), zobrist_table: ZobristTable::initial_table() }
     }
 
+    #[inline(always)]
+    const fn king_square(&self, side: Side) -> Square {
+        self.chessboard.king_square(side)
+    }
+
+    #[inline(always)]
+    pub fn side(&self) -> Side {
+        self.chessboard.side()
+    }
+
+    #[inline(always)]
+    pub const fn hash(&self) -> ZobristHash {
+        self.chessboard.hash()
+    }
+
+    #[inline(always)]
+    pub fn mailbox(&self) -> Mailbox {
+        self.chessboard.mailbox()
+    }
+
+    #[inline(always)]
+    pub fn piece_bitboard(&self, chess_piece: ChessPiece) -> Bitboard {
+        self.chessboard.bitboards.piece_bitboard(chess_piece)
+    }
+
+    #[inline(always)]
+    pub const fn square_index(&self, square: Square) -> Option<ChessPiece> {
+        self.chessboard.mailbox.square_index(square)
+    }
+
+    #[inline(always)]
+    pub fn repetition(&self) -> usize {
+        self.zobrist_table.count_hash(self.hash())
+    }
+
+    pub fn try_generate_moves(&self) -> (MoveList, GameState) {
+        if self.repetition() >= 3 || self.chessboard.is_fifty_move_rule() {
+            return (MoveList::new(), GameState::Finished(GameResult::Draw));
+        }
+        let side = self.side();
+        let moves = self.chessboard.generate_moves();
+        if moves.len() != 0 {
+            return (moves, GameState::Ongoing);
+        } else if self.chessboard.is_king_in_check(side) {
+            return (moves, GameState::Finished(GameResult::Win(side.update())));
+        } else {
+            return (moves, GameState::Finished(GameResult::Draw));
+        }
+    }
+
     pub fn from_fen(input: &str) -> ChessGame {
         let chessboard: ChessBoard = ChessBoard::from_fen(input);
         let zobrist_table: ZobristTable = ZobristTable::new(chessboard.hash());
@@ -215,6 +276,7 @@ impl ChessGame {
         self.chessboard.data = snapshot.data;
         self.zobrist_table.remove_last(snapshot.hash);
     }
+
     pub fn update_state(&mut self, chess_move: &ChessMove) {
         self.chessboard.update_state(chess_move);
         self.zobrist_table.push(self.chessboard.hash());
@@ -226,20 +288,60 @@ impl ChessBoard {
         ChessBoard { bitboards: PieceBitboard::START_BOARD, mailbox: Mailbox::START_MAILBOX, data: ChessData::start_pos() }
     }
 
+    #[inline(always)]
+    const fn king_square(&self, side: Side) -> Square {
+        self.piece_bitboard(ChessPiece(side, PieceType::King)).lsb_square().expect("King not found!")
+    }
+
+    pub(crate) const fn is_king_in_check(&self, king_side: Side) -> bool {
+        let square = self.piece_bitboard(ChessPiece(king_side, PieceType::King)).lsb_square().expect("King not found!");
+        self.is_square_attacked(square, king_side.update(), self.bitboards.blockers())
+    }
+
+    #[inline(always)]
+    pub const fn side(&self) -> Side {
+        self.data.side_to_move
+    }
+
+    #[inline(always)]
+    pub const fn hash(&self) -> ZobristHash {
+        self.data.zobrist_hash
+    }
+
+    #[inline(always)]
+    pub fn mailbox(&self) -> Mailbox {
+        self.mailbox
+    }
+
+    #[inline(always)]
+    pub const fn piece_bitboard(&self, chess_piece: ChessPiece) -> Bitboard {
+        self.bitboards.piece_bitboard(chess_piece)
+    }
+
+    #[inline(always)]
+    pub const fn square_index(&self, square: Square) -> Option<ChessPiece> {
+        self.mailbox.square_index(square)
+    }
+
+    #[inline(always)]
+    pub fn is_fifty_move_rule(&self) -> bool {
+        self.data.fifty_move_rule_counter >= 100
+    }
+
     pub(crate) fn is_castling_legal(&self, castling: Castling) -> bool {
         let blockers: Bitboard = self.bitboards.blockers();
         let (king_square, rook_square, castling_mask, castling_index) = match castling {
             Castling::Kingside(Side::White) => {
-                (self.bitboards.piece_bitboard(ChessPiece::WK).lsb_square().unwrap(), Square::W_KINGSIDE_ROOK_SQ_SOURCE, W_KING_SIDE_CASTLE_MASK, 0usize)
+                (self.piece_bitboard(ChessPiece::WK).lsb_square().unwrap(), Square::W_KINGSIDE_ROOK_SQ_SOURCE, W_KING_SIDE_CASTLE_MASK, 0usize)
             }
             Castling::Queenside(Side::White) => {
-                (self.bitboards.piece_bitboard(ChessPiece::WK).lsb_square().unwrap(), Square::W_QUEENSIDE_ROOK_SQ_SOURCE, W_QUEEN_SIDE_CASTLE_MASK, 1usize)
+                (self.piece_bitboard(ChessPiece::WK).lsb_square().unwrap(), Square::W_QUEENSIDE_ROOK_SQ_SOURCE, W_QUEEN_SIDE_CASTLE_MASK, 1usize)
             }
             Castling::Kingside(Side::Black) => {
-                (self.bitboards.piece_bitboard(ChessPiece::BK).lsb_square().unwrap(), Square::B_KINGSIDE_ROOK_SQ_SOURCE, B_KING_SIDE_CASTLE_MASK, 2usize)
+                (self.piece_bitboard(ChessPiece::BK).lsb_square().unwrap(), Square::B_KINGSIDE_ROOK_SQ_SOURCE, B_KING_SIDE_CASTLE_MASK, 2usize)
             }
             Castling::Queenside(Side::Black) => {
-                (self.bitboards.piece_bitboard(ChessPiece::BK).lsb_square().unwrap(), Square::B_QUEENSIDE_ROOK_SQ_SOURCE, B_QUEEN_SIDE_CASTLE_MASK, 3usize)
+                (self.piece_bitboard(ChessPiece::BK).lsb_square().unwrap(), Square::B_QUEENSIDE_ROOK_SQ_SOURCE, B_QUEEN_SIDE_CASTLE_MASK, 3usize)
             }
         };
 
@@ -271,17 +373,17 @@ impl ChessBoard {
             Side::White => get_w_pawn_attack(square),
             Side::Black => get_b_pawn_attack(square),
         };
-        if (pawn_attack_bb.bit_and(&self.bitboards.piece_bitboard(ChessPiece(attacker_side, PieceType::Pawn)))).is_not_zero() {
+        if (pawn_attack_bb.bit_and(&self.piece_bitboard(ChessPiece(attacker_side, PieceType::Pawn)))).is_not_zero() {
             return true;
-        } else if (get_knight_attack(square).bit_and(&self.bitboards.piece_bitboard(ChessPiece(attacker_side, PieceType::Knight)))).is_not_zero() {
+        } else if (get_knight_attack(square).bit_and(&self.piece_bitboard(ChessPiece(attacker_side, PieceType::Knight)))).is_not_zero() {
             return true;
-        } else if (get_bishop_attack(square, blockers).bit_and(&self.bitboards.piece_bitboard(ChessPiece(attacker_side, PieceType::Bishop)))).is_not_zero() {
+        } else if (get_bishop_attack(square, blockers).bit_and(&self.piece_bitboard(ChessPiece(attacker_side, PieceType::Bishop)))).is_not_zero() {
             return true;
-        } else if (get_rook_attack(square, blockers).bit_and(&self.bitboards.piece_bitboard(ChessPiece(attacker_side, PieceType::Rook)))).is_not_zero() {
+        } else if (get_rook_attack(square, blockers).bit_and(&self.piece_bitboard(ChessPiece(attacker_side, PieceType::Rook)))).is_not_zero() {
             return true;
-        } else if (get_queen_attack(square, blockers).bit_and(&self.bitboards.piece_bitboard(ChessPiece(attacker_side, PieceType::Queen)))).is_not_zero() {
+        } else if (get_queen_attack(square, blockers).bit_and(&self.piece_bitboard(ChessPiece(attacker_side, PieceType::Queen)))).is_not_zero() {
             return true;
-        } else if (get_king_attack(square).bit_and(&self.bitboards.piece_bitboard(ChessPiece(attacker_side, PieceType::King)))).is_not_zero() {
+        } else if (get_king_attack(square).bit_and(&self.piece_bitboard(ChessPiece(attacker_side, PieceType::King)))).is_not_zero() {
             return true;
         }
 
@@ -292,40 +394,22 @@ impl ChessBoard {
     pub const fn is_square_attacked_conditional(&self, square: Square, attacker_side: Side, blockers: Bitboard) -> bool {
         match attacker_side {
             Side::White => {
-                (get_b_pawn_attack(square).bit_and(&self.bitboards.piece_bitboard(ChessPiece::WP))).is_not_zero()
-                    || (get_rook_attack(square, blockers).bit_and(&self.bitboards.piece_bitboard(ChessPiece::WR))).is_not_zero()
-                    || (get_bishop_attack(square, blockers).bit_and(&self.bitboards.piece_bitboard(ChessPiece::WB))).is_not_zero()
-                    || (get_knight_attack(square).bit_and(&self.bitboards.piece_bitboard(ChessPiece::WN))).is_not_zero()
-                    || (get_queen_attack(square, blockers).bit_and(&self.bitboards.piece_bitboard(ChessPiece::WQ))).is_not_zero()
-                    || (get_king_attack(square).bit_and(&self.bitboards.piece_bitboard(ChessPiece::WK))).is_not_zero()
+                (get_b_pawn_attack(square).bit_and(&self.piece_bitboard(ChessPiece::WP))).is_not_zero()
+                    || (get_rook_attack(square, blockers).bit_and(&self.piece_bitboard(ChessPiece::WR))).is_not_zero()
+                    || (get_bishop_attack(square, blockers).bit_and(&self.piece_bitboard(ChessPiece::WB))).is_not_zero()
+                    || (get_knight_attack(square).bit_and(&self.piece_bitboard(ChessPiece::WN))).is_not_zero()
+                    || (get_queen_attack(square, blockers).bit_and(&self.piece_bitboard(ChessPiece::WQ))).is_not_zero()
+                    || (get_king_attack(square).bit_and(&self.piece_bitboard(ChessPiece::WK))).is_not_zero()
             }
             Side::Black => {
-                (get_w_pawn_attack(square).bit_and(&self.bitboards.piece_bitboard(ChessPiece::BP))).is_not_zero()
-                    || (get_rook_attack(square, blockers).bit_and(&self.bitboards.piece_bitboard(ChessPiece::BR))).is_not_zero()
-                    || (get_bishop_attack(square, blockers).bit_and(&self.bitboards.piece_bitboard(ChessPiece::BB))).is_not_zero()
-                    || (get_knight_attack(square).bit_and(&self.bitboards.piece_bitboard(ChessPiece::BN))).is_not_zero()
-                    || (get_queen_attack(square, blockers).bit_and(&self.bitboards.piece_bitboard(ChessPiece::BQ))).is_not_zero()
-                    || (get_king_attack(square).bit_and(&self.bitboards.piece_bitboard(ChessPiece::BK))).is_not_zero()
+                (get_w_pawn_attack(square).bit_and(&self.piece_bitboard(ChessPiece::BP))).is_not_zero()
+                    || (get_rook_attack(square, blockers).bit_and(&self.piece_bitboard(ChessPiece::BR))).is_not_zero()
+                    || (get_bishop_attack(square, blockers).bit_and(&self.piece_bitboard(ChessPiece::BB))).is_not_zero()
+                    || (get_knight_attack(square).bit_and(&self.piece_bitboard(ChessPiece::BN))).is_not_zero()
+                    || (get_queen_attack(square, blockers).bit_and(&self.piece_bitboard(ChessPiece::BQ))).is_not_zero()
+                    || (get_king_attack(square).bit_and(&self.piece_bitboard(ChessPiece::BK))).is_not_zero()
             }
         }
-    }
-
-    #[inline(always)]
-    const fn king_square(&self, side: Side) -> Square {
-        self.bitboards.piece_bitboard(ChessPiece(side, PieceType::King)).lsb_square().expect("King not found!")
-    }
-
-    const fn side(&self) -> Side {
-        self.data.side_to_move
-    }
-
-    const fn hash(&self) -> ZobristHash {
-        self.data.zobrist_hash
-    }
-
-    pub(crate) const fn is_king_in_check(&self, king_side: Side) -> bool {
-        let square = self.bitboards.piece_bitboard(ChessPiece(king_side, PieceType::King)).lsb_square().expect("King not found!");
-        self.is_square_attacked(square, king_side.update(), self.bitboards.blockers())
     }
 }
 

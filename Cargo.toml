@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members  = [ "chessbb", "nnet", "pp0" ]
+members  = [ "chessbb", "nnue", "pp0", "trainer" ]
 
 [profile.dev]
 opt-level = 1

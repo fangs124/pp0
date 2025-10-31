@@ -1,13 +1,9 @@
 use crate::{
     Bitboard, ChessBoard, ChessMove, ChessPiece, PieceType, Side,
-    bitboard::attack::{
-        get_bishop_attack, get_king_attack, get_knight_attack, get_pawn_attack, get_pawn_quiet, get_queen_attack, get_rook_attack, get_rook_ray, long_rays,
-        promotion_row, starting_row,
-    },
+    bitboard::attack::{get_bishop_attack, get_king_attack, get_knight_attack, get_pawn_attack, get_pawn_quiet, get_queen_attack, get_rook_attack, long_rays},
     chessboard::MoveList,
     chessmove::{Castling, MoveType},
     chesspiece::SliderType,
-    square::Square,
 };
 
 #[cfg(feature = "arrayvec")]
@@ -115,7 +111,7 @@ impl ChessBoard {
                     }
                 }
 
-                let row_bb = Bitboard::rows(source.to_row_usize()).bit_and(&Bitboard::rows(king_square.to_row_usize()));
+                let row_bb = Bitboard::rows(source.as_row_usize()).bit_and(&Bitboard::rows(king_square.as_row_usize()));
                 let horizontal_attackers = self.bitboards.piece_bitboard(ChessPiece(enemy_side, PieceType::Rook))
                     | self.bitboards.piece_bitboard(ChessPiece(enemy_side, PieceType::Queen));
 

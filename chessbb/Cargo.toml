@@ -4,11 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+nalgebra = {version = "0.34", features = [
+    "rand",
+    "serde-serialize",
+], optional = true}
+
 mimalloc = {version = "0.*", features = [ "v3" ], optional = true}
+bytemuck = {version = "1.*", optional = true}
 arrayvec = {version = "0.7.6", optional = true}
 smallvec = {version = "1.15.*", features = [
     "const_generics",
 ], optional = true}
+nnue = {path = "../nnue", optional = true}
 
 [features]
 default = [
@@ -17,9 +24,10 @@ default = [
     "rowcolmath",
     "piececolourboard",
     "kinglessattackmask",
+    "nnue",
 ]
 
-arrayvec           = [ "dep:arrayvec" ]
+arrayvec           = [ "dep:arrayvec", "nnue?/arrayvec" ]
 smallvec           = [ "dep:smallvec" ]
 piececolourboard   = [  ]
 maybemailbox       = [  ]
@@ -27,3 +35,5 @@ kinglessattackmask = [  ]
 rowcolmath         = [  ]
 diagmath           = [  ]
 mimalloc           = [ "dep:mimalloc" ]
+nnue               = [ "dep:nnue", "dep:nalgebra" ]
+bytemuck           = [ "dep:bytemuck" ]

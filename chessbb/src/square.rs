@@ -41,6 +41,29 @@ pub enum Square {
     A7, B7, C7, D7, E7, F7, G7, H7,
     A8, B8, C8, D8, E8, F8, G8, H8,
 }
+/* indexing the 64-squares:
+   -----------------------
+8 |56 57 58 59 60 61 62 63|
+7 |48 49 50 51 52 53 57 55|
+6 |40 41 42 43 44 45 46 47|
+5 |32 33 34 35 36 37 38 39|
+4 |24 25 26 27 28 29 30 31|
+3 |16 17 18 19 20 21 22 23|
+2 | 8  9 10 11 12 13 14 15|
+1 | 0  1  2  3  4  5  6  7|
+   -----------------------
+    A  B  C  D  E  F  G  H */
+#[rustfmt::skip]
+const FLIPPED_INDEX: [usize; 64] = [
+    56, 57, 58, 59, 60, 61, 62, 63, 
+    48, 49, 50, 51, 52, 53, 54, 55,
+    40, 41, 42, 43, 44, 45, 46, 47,
+    32, 33, 34, 35, 36, 37, 38, 39,
+    24, 25, 26, 27, 28, 29, 30, 31,
+    16, 17, 18, 19, 20, 21, 22, 23,
+    08, 09, 10, 11, 12, 13, 14, 15,
+    00, 01, 02, 03, 04, 05, 06, 07,
+];
 
 impl Display for Square {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -50,27 +73,32 @@ impl Display for Square {
 
 impl Square {
     #[inline(always)]
-    pub const fn to_usize(&self) -> usize {
+    pub const fn as_usize(&self) -> usize {
         *self as usize
     }
 
     #[inline(always)]
-    pub const fn to_u8(&self) -> u8 {
+    pub const fn as_usize_flipped(&self) -> usize {
+        FLIPPED_INDEX[*self as usize]
+    }
+
+    #[inline(always)]
+    pub const fn as_u8(&self) -> u8 {
         *self as u8
     }
 
     #[inline(always)]
-    pub const fn to_col_usize(&self) -> usize {
+    pub const fn as_col_usize(&self) -> usize {
         (*self as usize) % 8
     }
 
     #[inline(always)]
-    pub const fn to_col(&self) -> Column {
+    pub const fn as_col(&self) -> Column {
         Column::COLUMNS[(*self as usize) % 8]
     }
 
     #[inline(always)]
-    pub const fn to_row_usize(&self) -> usize {
+    pub const fn as_row_usize(&self) -> usize {
         (*self as usize) / 8
     }
 
@@ -87,25 +115,25 @@ impl Square {
      #[cfg(not(feature = "diagmath"))]
     #[inline(always)]
     pub(crate)const fn is_same_ddiag(s1: Square, s2: Square) -> bool {
-        Square::DDIAG[s1.to_usize()] == Square::DDIAG[s2.to_usize()]
+        Square::DDIAG[s1.as_usize()] == Square::DDIAG[s2.as_usize()]
     }
 
     #[cfg(not(feature = "diagmath"))]
     #[inline(always)]
     pub(crate)const fn is_same_adiag(s1: Square, s2: Square) -> bool {
-        Square::ADIAG[s1.to_usize()] == Square::ADIAG[s2.to_usize()]
+        Square::ADIAG[s1.as_usize()] == Square::ADIAG[s2.as_usize()]
     }
     
     #[cfg(feature = "rowcolmath")]
     #[inline(always)]
     pub(crate)const fn is_same_row(s1: Square, s2: Square) -> bool {
-        s1.to_row_usize() == s2.to_row_usize()
+        s1.as_row_usize() == s2.as_row_usize()
     }
     
     #[cfg(feature = "rowcolmath")]
     #[inline(always)]
     pub(crate) const fn is_same_col(s1: Square, s2: Square) -> bool {
-        s1.to_col_usize() == s2.to_col_usize()
+        s1.as_col_usize() == s2.as_col_usize()
     }
 
     #[cfg(feature = "diagmath")]
@@ -241,6 +269,8 @@ impl Square {
         Square::A7, Square::B7, Square::C7, Square::D7, Square::E7, Square::F7, Square::G7, Square::H7,
         Square::A8, Square::B8, Square::C8, Square::D8, Square::E8, Square::F8, Square::G8, Square::H8,
     ];
+
+    
 
     pub fn iter() -> std::slice::Iter<'static, Square> {
         Square::SQUARES.iter()

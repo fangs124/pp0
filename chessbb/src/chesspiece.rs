@@ -47,7 +47,7 @@ impl SliderType {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct ChessPiece(pub(crate) Side, pub(crate) PieceType);
+pub struct ChessPiece(pub Side, pub PieceType);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FenError {
@@ -184,16 +184,16 @@ impl ChessPiece {
         ChessPiece::PIECES.iter()
     }
 
-    pub(crate) const WK: ChessPiece = ChessPiece(Side::White, PieceType::King);
-    pub(crate) const WQ: ChessPiece = ChessPiece(Side::White, PieceType::Queen);
-    pub(crate) const WN: ChessPiece = ChessPiece(Side::White, PieceType::Knight);
-    pub(crate) const WB: ChessPiece = ChessPiece(Side::White, PieceType::Bishop);
-    pub(crate) const WR: ChessPiece = ChessPiece(Side::White, PieceType::Rook);
-    pub(crate) const WP: ChessPiece = ChessPiece(Side::White, PieceType::Pawn);
-    pub(crate) const BK: ChessPiece = ChessPiece(Side::Black, PieceType::King);
-    pub(crate) const BQ: ChessPiece = ChessPiece(Side::Black, PieceType::Queen);
-    pub(crate) const BN: ChessPiece = ChessPiece(Side::Black, PieceType::Knight);
-    pub(crate) const BB: ChessPiece = ChessPiece(Side::Black, PieceType::Bishop);
-    pub(crate) const BR: ChessPiece = ChessPiece(Side::Black, PieceType::Rook);
-    pub(crate) const BP: ChessPiece = ChessPiece(Side::Black, PieceType::Pawn);
+    pub const WK: ChessPiece = ChessPiece(Side::White, PieceType::King);
+    pub const WQ: ChessPiece = ChessPiece(Side::White, PieceType::Queen);
+    pub const WN: ChessPiece = ChessPiece(Side::White, PieceType::Knight);
+    pub const WB: ChessPiece = ChessPiece(Side::White, PieceType::Bishop);
+    pub const WR: ChessPiece = ChessPiece(Side::White, PieceType::Rook);
+    pub const WP: ChessPiece = ChessPiece(Side::White, PieceType::Pawn);
+    pub const BK: ChessPiece = ChessPiece(Side::Black, PieceType::King);
+    pub const BQ: ChessPiece = ChessPiece(Side::Black, PieceType::Queen);
+    pub const BN: ChessPiece = ChessPiece(Side::Black, PieceType::Knight);
+    pub const BB: ChessPiece = ChessPiece(Side::Black, PieceType::Bishop);
+    pub const BR: ChessPiece = ChessPiece(Side::Black, PieceType::Rook);
+    pub const BP: ChessPiece = ChessPiece(Side::Black, PieceType::Pawn);
 }

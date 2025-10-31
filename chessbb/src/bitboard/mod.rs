@@ -1,6 +1,6 @@
 use crate::square::Square;
 
-pub(crate) mod attack;
+pub mod attack;
 
 pub mod bit_ops;
 
@@ -59,14 +59,14 @@ impl ExactSizeIterator for Bitboard {
 }
 
 impl Bitboard {
-    pub(crate) const ZERO: Bitboard = Bitboard(0u64);
-    pub(crate) const ONES: Bitboard = Bitboard(u64::MAX);
+    pub const ZERO: Bitboard = Bitboard(0u64);
+    pub const ONES: Bitboard = Bitboard(u64::MAX);
 
     pub(crate) const NOT_A_FILE: Bitboard = Bitboard(0b01111111_01111111_01111111_01111111_01111111_01111111_01111111_01111111);
     pub(crate) const NOT_H_FILE: Bitboard = Bitboard(0b11111110_11111110_11111110_11111110_11111110_11111110_11111110_11111110);
     pub(crate) const NOT_PROMOTION_SQUARES: Bitboard = Bitboard(0b00000000_11111111_11111111_11111111_11111111_11111111_11111111_00000000);
     pub(crate) const PROMOTION_SQUARES: Bitboard = Bitboard(0b11111111_00000000_00000000_00000000_00000000_00000000_00000000_11111111);
-    
+
     pub(crate) const ROWS: [Bitboard; 8] = [
         Bitboard(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_11111111),
         Bitboard(0b00000000_00000000_00000000_00000000_00000000_00000000_11111111_00000000),
@@ -79,67 +79,67 @@ impl Bitboard {
     ];
 
     #[inline(always)]
-    pub(crate) const fn rows(nth: usize) -> Bitboard {
+    pub const fn rows(nth: usize) -> Bitboard {
         Bitboard::ROWS[nth]
     }
     #[inline(always)]
-    pub(crate) const fn nth(sq: Square) -> Self {
-        Bitboard(1u64 << sq.to_usize())
+    pub const fn nth(sq: Square) -> Self {
+        Bitboard(1u64 << sq.as_usize())
     }
 
     #[inline(always)]
-    pub(crate) const fn new(data: u64) -> Self {
+    pub const fn new(data: u64) -> Self {
         Bitboard(data)
     }
 
     #[inline(always)]
-    pub(crate) const fn nth_is_zero(&self, sq: Square) -> bool {
-        self.0 & (1u64 << sq.to_usize()) == 0
+    pub const fn nth_is_zero(&self, sq: Square) -> bool {
+        self.0 & (1u64 << sq.as_usize()) == 0
     }
 
     #[inline(always)]
-    pub(crate) const fn nth_is_not_zero(&self, sq: Square) -> bool {
-        self.0 & (1u64 << sq.to_usize()) != 0
+    pub const fn nth_is_not_zero(&self, sq: Square) -> bool {
+        self.0 & (1u64 << sq.as_usize()) != 0
     }
 
     #[inline(always)]
-    pub(crate) const fn is_zero(&self) -> bool {
+    pub const fn is_zero(&self) -> bool {
         self.0 == 0u64
     }
 
     #[inline(always)]
-    pub(crate) const fn is_not_zero(&self) -> bool {
+    pub const fn is_not_zero(&self) -> bool {
         self.0 != 0u64
     }
 
     #[inline(always)]
-    pub(crate) const fn set_bit(&mut self, square: Square) {
-        self.0 |= 1u64 << square.to_usize();
+    pub const fn set_bit(&mut self, square: Square) {
+        self.0 |= 1u64 << square.as_usize();
     }
 
     #[inline(always)]
-    pub(crate) const fn flip_bit(&mut self, square: Square) {
-        self.0 ^= 1u64 << square.to_usize();
+    pub const fn flip_bit(&mut self, square: Square) {
+        self.0 ^= 1u64 << square.as_usize();
     }
 
     #[inline(always)]
-    pub(crate) const fn get_bit(&self, i: usize) -> Bitboard {
+    pub const fn get_bit(&self, i: usize) -> Bitboard {
         Bitboard(self.0 & (1u64 << i))
     }
 
     #[inline(always)]
-    pub(crate) const fn pop_bit(&mut self, square: Square) {
-        self.0 &= !(1u64 << square.to_usize());
+    pub const fn pop_bit(&mut self, square: Square) {
+        self.0 &= !(1u64 << square.as_usize());
     }
 
     #[inline(always)]
-    pub(crate) const fn pop_lsb(&mut self) {
+    pub const fn pop_lsb(&mut self) {
         self.0 &= self.0.wrapping_sub(1);
     }
 
     // index of least-significant-bit (lsb)
     #[inline(always)]
-    pub(crate) const fn lsb_index(&self) -> Option<usize> {
+    pub const fn lsb_index(&self) -> Option<usize> {
         match self.0 {
             0u64 => return None,
             x => return Some(x.trailing_zeros() as usize),
@@ -148,7 +148,7 @@ impl Bitboard {
 
     // square of least-significant-bit (lsb)
     #[inline(always)]
-    pub(crate) const fn lsb_square(&self) -> Option<Square> {
+    pub const fn lsb_square(&self) -> Option<Square> {
         match self.0 {
             0u64 => return None,
             x => return Some(Square::nth(x.trailing_zeros() as usize)),
@@ -157,48 +157,48 @@ impl Bitboard {
 
     // bitboard of least-significant-bit (lsb)
     #[inline(always)]
-    pub(crate) const fn lsb_bitboard(&self) -> Bitboard {
+    pub const fn lsb_bitboard(&self) -> Bitboard {
         return Bitboard(self.0 & self.0.wrapping_neg());
     }
 
-    pub(crate) const fn count_ones(&self) -> u32 {
+    pub const fn count_ones(&self) -> u32 {
         self.0.count_ones()
     }
 
     /* const bitwise operations */
 
     #[inline(always)]
-    pub(crate) const fn bit_and(&self, other: &Bitboard) -> Bitboard {
+    pub const fn bit_and(&self, other: &Bitboard) -> Bitboard {
         Bitboard(self.0 & other.0)
     }
 
     #[inline(always)]
-    pub(crate) const fn bit_or(&self, other: &Bitboard) -> Bitboard {
+    pub const fn bit_or(&self, other: &Bitboard) -> Bitboard {
         Bitboard(self.0 | other.0)
     }
 
     #[inline(always)]
-    pub(crate) const fn bit_xor(&self, other: &Bitboard) -> Bitboard {
+    pub const fn bit_xor(&self, other: &Bitboard) -> Bitboard {
         Bitboard(self.0 ^ other.0)
     }
 
     #[inline(always)]
-    pub(crate) const fn bit_not(&self) -> Bitboard {
+    pub const fn bit_not(&self) -> Bitboard {
         Bitboard(!self.0)
     }
 
     #[inline(always)]
-    pub(crate) const fn flip(&self) -> Self {
+    pub const fn flip(&self) -> Self {
         Bitboard(self.0.swap_bytes())
     }
 
     #[inline(always)]
-    pub(crate) const fn shl(&self, rhs: u32) -> Bitboard {
+    pub const fn shl(&self, rhs: u32) -> Bitboard {
         Bitboard(self.0.unbounded_shl(rhs))
     }
 
     #[inline(always)]
-    pub(crate) const fn shr(&self, rhs: u32) -> Bitboard {
+    pub const fn shr(&self, rhs: u32) -> Bitboard {
         Bitboard(self.0.unbounded_shr(rhs))
     }
 }

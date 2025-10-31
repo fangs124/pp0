@@ -1,5 +1,8 @@
 //use bytemuck::NoUninit;
 
+#[cfg(feature = "bytemuck")]
+use bytemuck::{AnyBitPattern, NoUninit};
+
 //use crate::bitboard::*;
 //use crate::chessmove::Castling;
 use crate::{
@@ -13,9 +16,14 @@ pub mod bit_ops;
 
 include!("data/data.rs");
 
-//#[derive(Debug, Copy, Clone, PartialEq, Eq, NoUninit)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+
+#[cfg(feature = "bytemuck")]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, NoUninit, AnyBitPattern)]
 #[repr(transparent)]
+pub struct ZobristHash(u64);
+
+#[cfg(not(feature = "bytemuck"))]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ZobristHash(u64);
 
 const DEFAULT_SIZE: usize = 1 << 10;
@@ -27,19 +35,19 @@ pub struct ZobristTable {
 }
 
 impl ZobristTable {
-    pub(super) const fn new(hash: ZobristHash) -> ZobristTable {
+    pub(crate) const fn new(hash: ZobristHash) -> ZobristTable {
         let mut data: [ZobristHash; DEFAULT_SIZE] = [ZobristHash(0); DEFAULT_SIZE];
         data[0] = hash;
         return ZobristTable { data, index: 0 };
     }
 
     #[inline(always)]
-    pub(super) const fn initial_table() -> ZobristTable {
+    pub(crate) const fn initial_table() -> ZobristTable {
         ZobristTable::new(ZobristHash::initial_hash())
     }
 
     #[inline(always)]
-    pub(super) const fn push(&mut self, hash: ZobristHash) {
+    pub(crate) const fn push(&mut self, hash: ZobristHash) {
         debug_assert!(self.index < (DEFAULT_SIZE));
         self.index += 1;
         self.data[self.index] = hash;
@@ -51,26 +59,42 @@ impl ZobristTable {
         self.index -= 1;
     }
 
-    #[inline(always)]
-    pub const unsafe fn remove_last_unchecked(&mut self) {
-        self.index -= 1;
+    pub const fn count_hash(&self, hash: ZobristHash) -> usize {
+        let mut i: usize = match self.index.checked_sub(100) {
+            Some(i) => i,
+            None => 0,
+        };
+
+        let mut count: usize = 0;
+        while i <= self.index {
+            if self.data[i].0 == hash.0 {
+                count += 1;
+            }
+            i += 2
+        }
+        return count;
     }
 }
 
 impl ZobristHash {
-    pub(super) const ZERO: ZobristHash = ZobristHash(0);
+    pub const ZERO: ZobristHash = ZobristHash(0);
 
     #[inline(always)]
-    pub(super) const fn to_u64(&self) -> u64 {
+    pub(crate) const fn to_u64(&self) -> u64 {
         self.0
     }
 
     #[inline(always)]
-    pub(super) const fn new(value: u64) -> ZobristHash {
+    pub const fn to_usize(&self) -> usize {
+        self.0 as usize
+    }
+
+    #[inline(always)]
+    pub(crate) const fn new(value: u64) -> ZobristHash {
         ZobristHash(value)
     }
 
-    pub(super) const fn initial_hash() -> ZobristHash {
+    pub(crate) const fn initial_hash() -> ZobristHash {
         let mut value: u64 = 0;
 
         //starting side is white, no hash
@@ -95,7 +119,12 @@ impl ZobristHash {
         ZobristHash(value)
     }
 
-    pub(super) const fn compute_hash(side: Side, mb: &Mailbox, castle: [bool; 4], enpassant: Bitboard) -> ZobristHash {
+    pub(crate) const fn compute_hash(
+        side: Side,
+        mb: &Mailbox,
+        castle: [bool; 4],
+        enpassant: Bitboard,
+    ) -> ZobristHash {
         //side hash
         let mut value = match side {
             Side::White => 0u64,
@@ -124,14 +153,14 @@ impl ZobristHash {
         let mut enpassant_bb = enpassant;
         while enpassant_bb.is_not_zero() {
             let square = enpassant_bb.lsb_square().unwrap();
-            value ^= ENPASSANT_FILE_HASH[square.to_col_usize()];
+            value ^= ENPASSANT_FILE_HASH[square.as_col_usize()];
             enpassant_bb.pop_bit(square);
         }
 
         ZobristHash(value)
     }
 
-    pub(super) const fn compute_castle_hash(chessboard: &ChessBoard) -> ZobristHash {
+    pub(crate) const fn compute_castle_hash(chessboard: &ChessBoard) -> ZobristHash {
         let mut value = 0u64;
 
         let mut i: usize = 0;
@@ -156,14 +185,14 @@ impl ZobristHash {
 
     #[inline(always)]
     pub(crate) const fn piece_hash(square: Square, chesspiece: ChessPiece) -> ZobristHash {
-        ZobristHash(PIECE_HASH[square.to_usize()][cp_index(chesspiece)])
+        ZobristHash(PIECE_HASH[square.as_usize()][cp_index(chesspiece)])
     }
 
-    pub(super) const fn enpassant_hash(enpassant_bb: Bitboard) -> ZobristHash {
+    pub(crate) const fn enpassant_hash(enpassant_bb: Bitboard) -> ZobristHash {
         //this function assumes there is only at most one non-zero bit in enpassant_bb
         debug_assert!(enpassant_bb.count_ones() <= 1);
         ZobristHash(match enpassant_bb.lsb_square() {
-            Some(square) => ENPASSANT_COL_HASH[square.to_col_usize()],
+            Some(square) => ENPASSANT_COL_HASH[square.as_col_usize()],
             None => 0,
         })
     }
