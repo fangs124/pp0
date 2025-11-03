@@ -5,7 +5,7 @@ use std::{
 };
 
 use chessbb::ChessBoard;
-use nnue::Network;
+use nnue::_Network;
 use pp0::{Evaluator, MaterialEvaluator, STATIC_EVAL, SearchLimit, StaticEvaluator};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -22,7 +22,7 @@ impl Player {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlayerEvaluator {
-    Network(Network),
+    Network(_Network),
     StaticEval(StaticEvaluator),
     MaterialEvaluator(MaterialEvaluator),
 }
@@ -30,7 +30,7 @@ pub enum PlayerEvaluator {
 impl Evaluator for PlayerEvaluator {
     fn eval(&mut self, chessgame: &chessbb::ChessGame) -> i16 {
         match self {
-            PlayerEvaluator::Network(network) => <Network as Evaluator>::eval(network, chessgame),
+            PlayerEvaluator::Network(network) => <_Network as Evaluator>::eval(network, chessgame),
             PlayerEvaluator::StaticEval(static_evaluator) => static_evaluator.eval(chessgame),
             PlayerEvaluator::MaterialEvaluator(material_evaluator) => material_evaluator.eval(chessgame),
         }
@@ -38,7 +38,7 @@ impl Evaluator for PlayerEvaluator {
 
     fn update(&mut self, chessgame: &chessbb::ChessGame, chessmove: &chessbb::ChessMove) {
         match self {
-            PlayerEvaluator::Network(network) => <Network as Evaluator>::update(network, chessgame, chessmove),
+            PlayerEvaluator::Network(network) => <_Network as Evaluator>::update(network, chessgame, chessmove),
             //PlayerEvaluator::Network(network) => <Network as Evaluator>::update(network, chessgame, chessmove),
             PlayerEvaluator::StaticEval(static_evaluator) => static_evaluator.update(chessgame, chessmove),
             PlayerEvaluator::MaterialEvaluator(material_evaluator) => material_evaluator.update(chessgame, chessmove),
@@ -47,7 +47,7 @@ impl Evaluator for PlayerEvaluator {
 
     fn revert(&mut self, chessgame: &chessbb::ChessGame, chessmove: &chessbb::ChessMove) {
         match self {
-            PlayerEvaluator::Network(network) => <Network as Evaluator>::revert(network, chessgame, chessmove),
+            PlayerEvaluator::Network(network) => <_Network as Evaluator>::revert(network, chessgame, chessmove),
             PlayerEvaluator::StaticEval(static_evaluator) => static_evaluator.revert(chessgame, chessmove),
             PlayerEvaluator::MaterialEvaluator(material_evaluator) => material_evaluator.revert(chessgame, chessmove),
         }
@@ -55,7 +55,7 @@ impl Evaluator for PlayerEvaluator {
 
     fn initialize(&mut self, chessgame: &chessbb::ChessGame) {
         match self {
-            PlayerEvaluator::Network(network) => <Network as Evaluator>::initialize(network, chessgame),
+            PlayerEvaluator::Network(network) => <_Network as Evaluator>::initialize(network, chessgame),
             PlayerEvaluator::StaticEval(static_evaluator) => static_evaluator.initialize(chessgame),
             PlayerEvaluator::MaterialEvaluator(material_evaluator) => material_evaluator.initialize(chessgame),
         }

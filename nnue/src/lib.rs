@@ -82,13 +82,9 @@ pub struct Network {
     accumulator_w: DVector<f32>,
     accumulator_b: DVector<f32>,
     input: Layer<INP, ACC>,
-    hidden: Layer<{ 2 * ACC }, HID>,
+    hidden: Layer<{ ACC }, HID>,
     output: Layer<HID, OUT>,
 }
-
-//NETWORK_SIZE_IN_BYTES 3682832
-const DATA_LEN: usize = size_of::<Network>();
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 // M input dimension -> N output dimension
 pub struct Layer<const COL: usize, const ROW: usize> {
@@ -105,9 +101,229 @@ impl Network {
         let accumulator_w: DVector<f32> = DVector::zeros(ACC);
         let accumulator_b: DVector<f32> = DVector::zeros(ACC);
         let input: Layer<INP, ACC> = Layer::new(Network::DEFAULT_IN_PHI);
-        let hidden: Layer<{ 2 * ACC }, HID> = Layer::new(Network::DEFAULT_IN_PHI);
+        let hidden: Layer<{ ACC }, HID> = Layer::new(Network::DEFAULT_IN_PHI);
         let output: Layer<HID, OUT> = Layer::new(Network::DEFAULT_OUT_PHI);
         Network { accumulator_w, accumulator_b, input, hidden, output }
+    }
+
+    pub fn update_grad(&mut self, grad: Gradient, r: f32) {
+        self.input.w += r * grad.input_dw;
+        self.input.b += r * grad.input_db;
+        self.hidden.w += r * grad.hidden_dw;
+        self.hidden.b += r * grad.hidden_db;
+        self.output.w += r * grad.output_dw;
+        self.output.b += r * grad.output_db;
+    }
+
+    //pub fn write(&self, writer: &mut impl Write) -> Result<(), Error> {
+    //    //from viridithas
+    //    let ptr: *const Network = &*self;
+    //    writer.write_all(unsafe { from_raw_parts(ptr.cast::<u8>(), DATA_LEN) })?;
+    //    Ok(())
+    //}
+    //
+    //pub fn read(reader: &mut impl Read) -> Result<Network, Error> {
+    //    //from viridithas
+    //    let data = {
+    //        let mut net: Box<MaybeUninit<NetworkData>> = Box::new(MaybeUninit::uninit());
+    //        let mem: &mut [u8] = unsafe { from_raw_parts_mut(net.as_mut_ptr().cast::<u8>(), DATA_LEN) };
+    //        reader.read_exact(mem)?;
+    //        unsafe { net.assume_init() }
+    //    };
+    //
+    //    Ok(Network { data })
+    //}
+
+    pub fn eval<const IS_STM_WHITE: bool>(&mut self) -> f32 {
+        let accumulator_stm = match IS_STM_WHITE {
+            true => &self.accumulator_w,
+            false => &self.accumulator_b,
+        };
+
+        let hidden_output = ((self.hidden.w.columns_range(0..ACC) * accumulator_stm.map(self.input.ty.phi())) + &self.hidden.b).map(self.hidden.ty.phi());
+
+        return self.output.phi(&hidden_output)[0];
+    }
+
+    pub fn accumulator_add<const IS_WHITE: bool>(&mut self, index: usize) {
+        match IS_WHITE {
+            true => self.accumulator_w += self.input.w.column(index),
+            false => self.accumulator_b += self.input.w.column(index),
+        }
+    }
+
+    pub fn accumulator_sub<const IS_WHITE: bool>(&mut self, index: usize) {
+        match IS_WHITE {
+            true => self.accumulator_w -= self.input.w.column(index),
+            false => self.accumulator_b -= self.input.w.column(index),
+        }
+    }
+
+    //corresponds to moving a piece
+    pub fn accumulator_addsub<const IS_WHITE: bool>(&mut self, add_index: usize, sub_index: usize) {
+        let accumulator = match IS_WHITE {
+            true => &mut self.accumulator_w,
+            false => &mut self.accumulator_b,
+        };
+        let mut i = 0;
+        while i < ACC {
+            //m[(r,c)]
+            accumulator[i] = self.input.w[(i, add_index)] - self.input.w[(i, sub_index)];
+            i += 1;
+        }
+        //*accumulator += self.input.w.column(add_index) - self.input.w.column(sub_index);
+    }
+
+    //corresponds to capturing a piece
+    pub fn accumulator_addsubsub<const IS_WHITE: bool>(&mut self, add_index: usize, sub_index1: usize, sub_index2: usize) {
+        let accumulator = match IS_WHITE {
+            true => &mut self.accumulator_w,
+            false => &mut self.accumulator_b,
+        };
+        let mut i = 0;
+        while i < ACC {
+            //m[(r,c)]
+            accumulator[i] = self.input.w[(i, add_index)] - self.input.w[(i, sub_index1)] - self.input.w[(i, sub_index2)];
+            i += 1;
+        }
+        //*accumulator += self.input.w.column(add_index) - self.input.w.column(sub_index1) - self.input.w.column(sub_index2);
+    }
+
+    //corresponds to capturing a piece
+    pub fn accumulator_addaddsub<const IS_WHITE: bool>(&mut self, add_index1: usize, add_index2: usize, sub_index: usize) {
+        let accumulator = match IS_WHITE {
+            true => &mut self.accumulator_w,
+            false => &mut self.accumulator_b,
+        };
+        let mut i = 0;
+        while i < ACC {
+            //m[(r,c)]
+            accumulator[i] = self.input.w[(i, add_index1)] + self.input.w[(i, add_index2)] - self.input.w[(i, sub_index)];
+            i += 1;
+        }
+        //*accumulator += self.input.w.column(add_index1) + self.input.w.column(add_index2) - self.input.w.column(sub_index);
+    }
+
+    pub fn refresh_accumulator(&mut self, input: &impl InputType) {
+        self.accumulator_w = self.input.linear_forward(&input.to_vector_white());
+        self.accumulator_b = self.input.linear_forward(&input.to_vector_black());
+    }
+
+    #[cfg(not(feature = "arrayvec"))]
+    pub fn refresh_accumulator_sparse(&mut self, input: &impl SparseInputType) {
+        let input_white = input.to_sparse_vec_white();
+        let input_black = input.to_sparse_vec_black();
+        let w = self.input.w;
+
+        self.accumulator_w = input_white.into_iter().fold(self.accumulator_w.clone(), |sum, i| sum + w.column(i));
+        self.accumulator_b = input_black.into_iter().fold(self.accumulator_b.clone(), |sum, i| sum + w.column(i));
+    }
+
+    #[cfg(feature = "arrayvec")]
+    pub fn refresh_accumulator_sparse(&mut self, input: &impl SparseInputType) {
+        let input_white = input.to_sparse_vec_white();
+        let input_black = input.to_sparse_vec_black();
+        let w = &self.input.w;
+
+        self.accumulator_w = input_white.into_iter().fold(self.input.b.clone(), |sum, i| sum + w.column(i));
+        self.accumulator_b = input_black.into_iter().fold(self.input.b.clone(), |sum, i| sum + w.column(i));
+    }
+
+    #[inline(always)]
+    pub fn backward_prop_sparse(&mut self, in_stm: SparseVec, in_ntm: SparseVec, target: DVector<f32>, r: f32) -> Gradient {
+        let mut stm: DVector<f32> = DVector::zeros(INP);
+        let mut ntm: DVector<f32> = DVector::zeros(INP);
+
+        for index in in_stm {
+            stm[index] = 1.0;
+        }
+
+        for index in in_ntm {
+            ntm[index] = 1.0;
+        }
+
+        self.backward_prop(stm, ntm, target, r)
+    }
+
+    pub fn backward_prop(&mut self, stm: DVector<f32>, ntm: DVector<f32>, target: DVector<f32>, r: f32) -> Gradient {
+        let accumulator = self.input.linear_forward(&stm);
+        //let accumulator_ntm = self.input.linear_forward(&ntm);
+        //let mut accumulator: DVector<f32> = DVector::zeros(ACC);
+        //for i in 0..ACC {
+        //    accumulator[i] = accumulator_stm[i];
+        //    accumulator[ACC + i] = accumulator_ntm[i];
+        //}
+        //let input_output_stm = self.input.linear_forward(&stm).map(self.input.ty.phi());
+        //let input_output_ntm = self.input.linear_forward(&ntm).map(self.input.ty.phi());
+        let input_output = accumulator.map(self.input.ty.phi());
+        let hidden_linear = &self.hidden.w * &input_output + &self.hidden.b;
+        let hidden_output = hidden_linear.map(self.hidden.ty.phi());
+        //let hidden_output = (self.hidden.w.columns_range(0..ACC) * input_output_stm)
+        //    + (self.hidden.w.columns_range(ACC..2 * ACC) * input_output_ntm)
+        //    + &self.hidden.b.map(self.hidden.ty.phi());
+        let output_linear = self.output.linear_forward(&hidden_output);
+        let output_dphida = r.abs() * (output_linear.map(self.output.ty.phi()) - target);
+
+        let mut grad = Gradient::zeros();
+
+        // hidden_layer -> output_layer
+        let output_dphidz = output_dphida.component_mul(&output_linear.map(self.output.ty.dphi()));
+        let output_dzdw = hidden_output;
+        let hidden_dphida = self.output.w.tr_mul(&output_dphidz);
+        grad.output_dw = &output_dphidz * output_dzdw.transpose();
+        grad.output_db = output_dphidz;
+
+        // input_layer -> hidden_layer
+        let hidden_dphidz = hidden_dphida.component_mul(&hidden_linear.map(self.hidden.ty.dphi()));
+        let hidden_dzdw = input_output;
+        let input_dphida = self.hidden.w.tr_mul(&hidden_dphidz);
+        grad.hidden_dw = &hidden_dphidz * hidden_dzdw.transpose();
+        grad.hidden_db = hidden_dphidz;
+
+        // input -> input_layer
+        let input_dphidz: _ = input_dphida.rows(0, ACC).component_mul(&accumulator.map(self.input.ty.dphi()));
+        let input_dzdw = stm;
+
+        grad.input_dw = &input_dphidz * input_dzdw.transpose();
+        grad.input_db = input_dphidz;
+        return grad;
+    }
+
+    pub fn regularization_term(&self, lambda: f32) -> Gradient {
+        let mut grad = Gradient::zeros();
+        grad.input_dw = lambda.abs() * &self.input.w;
+        grad.input_db = lambda.abs() * &self.input.b;
+        grad.hidden_dw = lambda.abs() * &self.hidden.w;
+        grad.hidden_db = lambda.abs() * &self.hidden.b;
+        grad.output_dw = lambda.abs() * &self.output.w;
+        grad.output_db = lambda.abs() * &self.output.b;
+        return grad;
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct _Network {
+    accumulator_w: DVector<f32>,
+    accumulator_b: DVector<f32>,
+    input: Layer<INP, ACC>,
+    hidden: Layer<{ 2 * ACC }, HID>,
+    output: Layer<HID, OUT>,
+}
+
+//NETWORK_SIZE_IN_BYTES 3682832
+const DATA_LEN: usize = size_of::<_Network>();
+
+impl _Network {
+    const DEFAULT_IN_PHI: PhiT = PhiT::CReLU;
+    const DEFAULT_OUT_PHI: PhiT = PhiT::Tanh;
+
+    pub fn new() -> _Network {
+        let accumulator_w: DVector<f32> = DVector::zeros(ACC);
+        let accumulator_b: DVector<f32> = DVector::zeros(ACC);
+        let input: Layer<INP, ACC> = Layer::new(_Network::DEFAULT_IN_PHI);
+        let hidden: Layer<{ 2 * ACC }, HID> = Layer::new(_Network::DEFAULT_IN_PHI);
+        let output: Layer<HID, OUT> = Layer::new(_Network::DEFAULT_OUT_PHI);
+        _Network { accumulator_w, accumulator_b, input, hidden, output }
     }
 
     pub fn update_grad(&mut self, grad: Gradient, r: f32) {

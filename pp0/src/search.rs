@@ -147,7 +147,7 @@ impl SearchData {
             //search previous best_move
             ev.update(&chessgame, &best_move);
             let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&best_move);
-            let eval: i16 = -self.negamax::<false, true>(chessgame, best_eval, i16::MAX - 1, d, ev, tt.clone(), None, Some(node_limit.hard_limit));
+            let eval: i16 = -self.negamax::<false, true>(chessgame, i16::MIN + 1, -best_eval, d, ev, tt.clone(), None, Some(node_limit.hard_limit));
             chessgame.restore_state(snapshot);
             ev.revert(&chessgame, &best_move);
             if self.is_aborted {
@@ -170,7 +170,7 @@ impl SearchData {
 
                 ev.update(&chessgame, &chessmove);
                 let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&chessmove);
-                let eval: i16 = -self.negamax::<false, true>(chessgame, best_eval, i16::MAX - 1, d, ev, tt.clone(), None, Some(node_limit.hard_limit));
+                let eval: i16 = -self.negamax::<false, true>(chessgame, i16::MIN + 1, -best_eval, d, ev, tt.clone(), None, Some(node_limit.hard_limit));
                 chessgame.restore_state(snapshot);
                 ev.revert(&chessgame, &chessmove);
                 if self.is_aborted {
@@ -229,7 +229,7 @@ impl SearchData {
             //search previous best_move
             ev.update(&chessgame, &best_move);
             let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&best_move);
-            let eval: i16 = -self.negamax::<true, false>(chessgame, best_eval, i16::MAX - 1, d, ev, tt.clone(), Some((start, time_limit.hard_limit)), None);
+            let eval: i16 = -self.negamax::<true, false>(chessgame, i16::MIN + 1, -best_eval, d, ev, tt.clone(), Some((start, time_limit.hard_limit)), None);
             chessgame.restore_state(snapshot);
             ev.revert(&chessgame, &best_move);
 
@@ -253,7 +253,8 @@ impl SearchData {
 
                 ev.update(&chessgame, &chessmove);
                 let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&chessmove);
-                let eval: i16 = -self.negamax::<true, false>(chessgame, best_eval, i16::MAX - 1, d, ev, tt.clone(), Some((start, time_limit.hard_limit)), None);
+                let eval: i16 =
+                    -self.negamax::<true, false>(chessgame, i16::MIN + 1, -best_eval, d, ev, tt.clone(), Some((start, time_limit.hard_limit)), None);
                 chessgame.restore_state(snapshot);
                 ev.revert(&chessgame, &chessmove);
 
@@ -305,7 +306,7 @@ impl SearchData {
         for chessmove in moves {
             ev.update(&chessgame, &chessmove);
             let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&chessmove);
-            let eval: i16 = -self.negamax::<false, false>(chessgame, best_eval, i16::MAX - 1, d.get() - 1, ev, tt.clone(), None, None);
+            let eval: i16 = -self.negamax::<false, false>(chessgame, i16::MIN + 1, -best_eval, d.get() - 1, ev, tt.clone(), None, None);
             chessgame.restore_state(snapshot);
             ev.revert(&chessgame, &chessmove);
 
