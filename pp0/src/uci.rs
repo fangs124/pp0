@@ -5,7 +5,7 @@ use std::{
 };
 
 use chessbb::{ChessGame, ChessMove, Side, Square};
-use nnue::_Network;
+use nnue::Network;
 
 use crate::{
     Evaluator, SearchData, SearchLimit, TimeLimit, TranspositionTable,
@@ -13,7 +13,7 @@ use crate::{
 };
 type TT = TranspositionTable;
 
-pub fn uci_loop(net: &mut _Network) -> io::Result<()> {
+pub fn uci_loop(net: &mut Network) -> io::Result<()> {
     let mut chessgame = ChessGame::start_pos();
     let mut reader = io::BufReader::new(io::stdin());
     let mut buffer = String::with_capacity(1 << 8);
@@ -87,7 +87,7 @@ pub fn uci_position(chessgame: &mut ChessGame, cmd_str: &str, last_fen: &mut Vec
     }
 }
 
-pub fn uci_go(chessgame: &mut ChessGame, cmd_str: &str, net: &mut _Network, tt: Arc<TT>) {
+pub fn uci_go(chessgame: &mut ChessGame, cmd_str: &str, net: &mut Network, tt: Arc<TT>) {
     let now: Instant = Instant::now();
     let mut cmds = cmd_str.split(' ');
     let mut wtime: Duration = Duration::from_secs(1);
@@ -136,7 +136,7 @@ pub fn uci_go(chessgame: &mut ChessGame, cmd_str: &str, net: &mut _Network, tt: 
 
 const LOOP_COUNT_CHECK_LIMIT: usize = 2048;
 pub fn uci_iterative_deepening(
-    chessgame: &mut ChessGame, net: &mut _Network, max_depth: Option<u16>, tt: Arc<TT>, now: Instant, soft_time_limit: Duration, hard_time_limit: Duration,
+    chessgame: &mut ChessGame, net: &mut Network, max_depth: Option<u16>, tt: Arc<TT>, now: Instant, soft_time_limit: Duration, hard_time_limit: Duration,
 ) {
     let moves = chessgame.try_generate_moves().0;
     assert!(!moves.is_empty());

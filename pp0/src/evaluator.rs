@@ -1,5 +1,5 @@
 use chessbb::{ChessBoard, ChessGame, ChessMove, ChessPiece, MoveType, PieceType, Side, Square, castle_index, index};
-use nnue::_Network;
+use nnue::Network;
 
 pub trait Evaluator {
     //i16 is used here as a fixed-precision evaluation out of 2000
@@ -19,10 +19,10 @@ pub const MATERIAL_EVAL: MaterialEvaluator = MaterialEvaluator;
 pub const STATIC_EVAL: StaticEvaluator = StaticEvaluator;
 
 
-impl Evaluator for _Network {
+impl Evaluator for Network {
     fn eval(&mut self, chessgame: &ChessGame) -> i16 {
         //self.initialize(chessgame);
-        self.refresh_accumulator_sparse(chessgame);
+        //self.refresh_accumulator_sparse(chessgame);
         match chessgame.side() {
             Side::White => (self.eval::<true>() * 2000.0 ) as i16,
             Side::Black => (self.eval::<false>() * 2000.0 ) as i16,

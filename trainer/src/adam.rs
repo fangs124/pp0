@@ -1,6 +1,6 @@
 use chessbb::{GameResult, Side};
 use nalgebra::{DVector, SVector};
-use nnue::{_Network, Gradient};
+use nnue::{Network, Gradient};
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, AtomicU8};
 use std::{
@@ -20,7 +20,7 @@ use termion::{
 
 use crate::{LAMBDA, LEARNING_RATE, LOOP_COUNT_CHECK_LIMIT, simulation::MatchResult};
 
-pub fn sgd(net: &mut _Network, results: Vec<MatchResult>) {
+pub fn sgd(net: &mut Network, results: Vec<MatchResult>) {
     let mut i: usize = 0;
     for result in results {
         let grad = game_gradient(net, result);
@@ -31,7 +31,7 @@ pub fn sgd(net: &mut _Network, results: Vec<MatchResult>) {
     }
 }
 
-pub fn adam_single_threaded(net: &mut _Network, results: Vec<MatchResult>, beta1: f32, beta2: f32, m: &mut Gradient, v: &mut Gradient) {
+pub fn adam_single_threaded(net: &mut Network, results: Vec<MatchResult>, beta1: f32, beta2: f32, m: &mut Gradient, v: &mut Gradient) {
     let mut m_grad = m.clone();
     let mut v_grad = v.clone();
 
@@ -54,7 +54,7 @@ const GRADIENT_MINIBATCH: usize = 1000;
 const MAX_GRADIENT_THREAD_COUNT: usize = 24;
 static INSTANCE_COUNT: AtomicU8 = AtomicU8::new(0);
 const GRADIENT_LOOP_COUNT_CHECK_LIMIT: usize = 2048 * 4;
-pub fn adam(net: &mut _Network, results: Vec<MatchResult>, beta1: f32, beta2: f32, m: &mut Gradient, v: &mut Gradient) -> io::Result<()> {
+pub fn adam(net: &mut Network, results: Vec<MatchResult>, beta1: f32, beta2: f32, m: &mut Gradient, v: &mut Gradient) -> io::Result<()> {
     let start_of_gradient = Instant::now();
     let total_results = results.len();
     let number_of_updates = total_results / GRADIENT_MINIBATCH;
@@ -236,7 +236,7 @@ pub fn adam(net: &mut _Network, results: Vec<MatchResult>, beta1: f32, beta2: f3
     Ok(())
 }
 
-pub fn game_gradient(net: &mut _Network, data: MatchResult) -> Gradient {
+pub fn game_gradient(net: &mut Network, data: MatchResult) -> Gradient {
     let pairs = data.pairs.unwrap();
     let total_moves = pairs.len();
     let reward: f32 = match (data.p1_side, data.result) {

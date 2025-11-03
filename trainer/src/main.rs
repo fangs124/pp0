@@ -29,7 +29,7 @@ use crate::{
 use chessbb::{ChessGame, GameResult, Side};
 use inquire::Select;
 use nnue::SparseInputType;
-use nnue::{_Network, Gradient};
+use nnue::{Gradient, Network};
 use pp0::{Evaluator, STATIC_EVAL, SearchLimit};
 use pp0::{MATERIAL_EVAL, MaterialEvaluator};
 use rand::{random_bool, random_range};
@@ -51,7 +51,7 @@ enum LoopState {
     Review,
 }
 
-const LEARNING_RATE: f32 = 0.01; //0.001
+const LEARNING_RATE: f32 = 0.001; //0.001
 const LAMBDA: f32 = 0.01;
 const BETA1: f32 = 0.9;
 const BETA2: f32 = 0.99;
@@ -68,8 +68,8 @@ static INSTANCE_COUNT: AtomicU8 = AtomicU8::new(0);
 static EPOCH: AtomicU16 = AtomicU16::new(0);
 fn main() -> std::io::Result<()> {
     rayon::ThreadPoolBuilder::new().thread_name(|x: usize| format!("Thread:{x}")).build_global().unwrap();
-    let mut net: _Network = match prompt_load().prompt().unwrap() {
-        true => _Network::new(),
+    let mut net: Network = match prompt_load().prompt().unwrap() {
+        true => Network::new(),
         false => {
             let file = File::open(NET_FILENAME)?;
             let mut buf_reader = BufReader::new(file);
@@ -107,7 +107,7 @@ const DEBUG_COLLECT_HISTORY: bool = true;
 const DEBUG_GAMES_TOTAL: usize = 5;
 static DEBUG_GAMES_COLLECTED: AtomicUsize = AtomicUsize::new(0);
 const LOOP_COUNT_CHECK_LIMIT: usize = 4194304 / 4;
-fn train(net: &mut _Network) -> std::io::Result<()> {
+fn train(net: &mut Network) -> std::io::Result<()> {
     let mut m: Gradient = Gradient::zeros();
     let mut v: Gradient = Gradient::zeros();
 
@@ -286,8 +286,8 @@ fn train(net: &mut _Network) -> std::io::Result<()> {
                     let file = File::create(PREVIOUS_FILENAME)?;
                     serde_json::to_writer(file, &net)?;
                     scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
-                    sgd(net, results);
-                    //adam_single_threaded(net, results, BETA1, BETA2, &mut m, &mut v);
+                    //sgd(net, results);
+                    adam_single_threaded(net, results, BETA1, BETA2, &mut m, &mut v);
                     //adam(net, results, BETA1, BETA2, &mut m, &mut v)?;
                     //update net, gradient stuff here
                     batch_size = BATCH_SIZE / 4;
