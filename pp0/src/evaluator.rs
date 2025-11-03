@@ -1,4 +1,4 @@
-use chessbb::{ChessBoard, ChessGame, ChessMove, ChessPiece, MoveType, PieceType, Side, castle_index, index};
+use chessbb::{ChessBoard, ChessGame, ChessMove, ChessPiece, MoveType, PieceType, Side, Square, castle_index, index};
 use nnue::Network;
 
 pub trait Evaluator {
@@ -21,6 +21,8 @@ pub const STATIC_EVAL: StaticEvaluator = StaticEvaluator;
 
 impl Evaluator for Network {
     fn eval(&mut self, chessgame: &ChessGame) -> i16 {
+        //self.initialize(chessgame);
+        self.refresh_accumulator_sparse(chessgame);
         match chessgame.side() {
             Side::White => (self.eval::<true>() * 2000.0 ) as i16,
             Side::Black => (self.eval::<false>() * 2000.0 ) as i16,
@@ -66,9 +68,13 @@ impl Evaluator for Network {
                 let target_square = chessmove.target();
                 let add_index_w = index(source_piece, target_square, Side::White);
                 let add_index_b = index(source_piece, target_square, Side::Black);
-                let target_piece = chessgame.square_index(chessmove.target()).unwrap();
-                let sub_index2_w = index(target_piece, target_square, Side::White);
-                let sub_index2_b = index(target_piece, target_square, Side::Black);
+                let victim_square: Square = match side {
+                    Side::White => chessmove.target().down(),
+                    Side::Black => chessmove.target().up(),
+                };
+                let victim_piece = chessgame.square_index(victim_square).unwrap();
+                let sub_index2_w = index(victim_piece, victim_square, Side::White);
+                let sub_index2_b = index(victim_piece, victim_square, Side::Black);
                 self.accumulator_addsubsub::<true>(add_index_w, sub_index_w, sub_index2_w);
                 self.accumulator_addsubsub::<false>(add_index_b, sub_index_b, sub_index2_b);
             },
@@ -132,9 +138,13 @@ impl Evaluator for Network {
                 let target_square = chessmove.target();
                 let add_index_w = index(source_piece, target_square, Side::White);
                 let add_index_b = index(source_piece, target_square, Side::Black);
-                let target_piece = chessgame.square_index(chessmove.target()).unwrap();
-                let sub_index2_w = index(target_piece, target_square, Side::White);
-                let sub_index2_b = index(target_piece, target_square, Side::Black);
+                 let victim_square: Square = match side {
+                    Side::White => chessmove.target().down(),
+                    Side::Black => chessmove.target().up(),
+                };
+                let victim_piece = chessgame.square_index(victim_square).unwrap();
+                let sub_index2_w = index(victim_piece, victim_square, Side::White);
+                let sub_index2_b = index(victim_piece, victim_square, Side::Black);
                 self.accumulator_addaddsub::<true>( sub_index_w, sub_index2_w, add_index_w);
                 self.accumulator_addaddsub::<false>( sub_index_b, sub_index2_b, add_index_b);
             },

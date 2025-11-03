@@ -80,7 +80,6 @@ version = "0.1.0"
 dependencies = [
  "arrayvec",
  "bytemuck",
- "mimalloc",
  "nalgebra",
  "nnue",
  "smallvec",
@@ -601,7 +600,9 @@ dependencies = [
  "bytemuck",
  "chessbb",
  "nnue",
+ "rayon",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -889,6 +890,7 @@ version = "0.1.0"
 dependencies = [
  "chessbb",
  "inquire",
+ "mimalloc",
  "nalgebra",
  "nnue",
  "pp0",

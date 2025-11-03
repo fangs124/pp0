@@ -6,7 +6,7 @@ use std::{
 
 use termion::{clear, cursor};
 
-use crate::player::Epoch;
+use crate::player::{Epoch, Player};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScoreBoard {
@@ -47,6 +47,20 @@ impl ScoreBoard {
             epoch,
             start_time: Instant::now(),
             now: Instant::now(),
+        }
+    }
+
+    pub fn update_ident(&mut self, p1: &Player, p1_string: &str, p2: &Player, p2_string: &str) {
+        match &p1.search_limit {
+            pp0::SearchLimit::Depth(d) => self.p1_identifier = format!("{} (depth {})", p1_string, d.get()),
+            pp0::SearchLimit::Nodes(n) => self.p1_identifier = format!("{} (nodes {}/{})", p1_string, n.data().0, n.data().1),
+            pp0::SearchLimit::Time(time_limit) => self.p1_identifier = format!("{} ", p1_string,),
+        }
+
+        match &p2.search_limit {
+            pp0::SearchLimit::Depth(d) => self.p2_identifier = format!("{} (depth {})", p2_string, d.get()),
+            pp0::SearchLimit::Nodes(n) => self.p2_identifier = format!("{} (nodes {}/{})", p2_string, n.data().0, n.data().1),
+            pp0::SearchLimit::Time(time_limit) => self.p2_identifier = format!("{} ", p2_string,),
         }
     }
 

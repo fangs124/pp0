@@ -79,7 +79,7 @@ impl Square {
 
     #[inline(always)]
     pub const fn as_usize_flipped(&self) -> usize {
-        FLIPPED_INDEX[*self as usize]
+        (*self as usize) ^ 0b111000 //chessprogramming.org trick??
     }
 
     #[inline(always)]

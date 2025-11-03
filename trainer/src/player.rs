@@ -6,7 +6,7 @@ use std::{
 
 use chessbb::ChessBoard;
 use nnue::Network;
-use pp0::{Evaluator, MaterialEvaluator, SearchLimit, StaticEvaluator};
+use pp0::{Evaluator, MaterialEvaluator, STATIC_EVAL, SearchLimit, StaticEvaluator};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Player {
@@ -39,6 +39,7 @@ impl Evaluator for PlayerEvaluator {
     fn update(&mut self, chessgame: &chessbb::ChessGame, chessmove: &chessbb::ChessMove) {
         match self {
             PlayerEvaluator::Network(network) => <Network as Evaluator>::update(network, chessgame, chessmove),
+            //PlayerEvaluator::Network(network) => <Network as Evaluator>::update(network, chessgame, chessmove),
             PlayerEvaluator::StaticEval(static_evaluator) => static_evaluator.update(chessgame, chessmove),
             PlayerEvaluator::MaterialEvaluator(material_evaluator) => material_evaluator.update(chessgame, chessmove),
         }

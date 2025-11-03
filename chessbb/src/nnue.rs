@@ -1,11 +1,11 @@
-use nalgebra::SVector;
+use nalgebra::{DVector, SVector};
 use nnue::{INPUT_DIMENSION, InputType, SparseInputType, SparseVec};
 
 use crate::{Castling, ChessGame, ChessPiece, Side, square::Square};
 
 impl InputType for ChessGame {
-    fn to_vector_white(&self) -> SVector<f32, INPUT_DIMENSION> {
-        let mut vector = SVector::zeros();
+    fn to_vector_white(&self) -> DVector<f32> {
+        let mut vector = DVector::zeros(INPUT_DIMENSION);
         let mailbox = self.mailbox();
         for &square in Square::iter() {
             if let Some(chess_piece) = mailbox.square_index(square) {
@@ -15,8 +15,8 @@ impl InputType for ChessGame {
         return vector;
     }
 
-    fn to_vector_black(&self) -> SVector<f32, INPUT_DIMENSION> {
-        let mut vector = SVector::zeros();
+    fn to_vector_black(&self) -> DVector<f32> {
+        let mut vector = DVector::zeros(INPUT_DIMENSION);
         let mailbox = self.mailbox();
         for &square in Square::iter() {
             if let Some(chess_piece) = mailbox.square_index(square) {

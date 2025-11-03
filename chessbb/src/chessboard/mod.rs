@@ -9,6 +9,7 @@ use arrayvec::ArrayVec;
 #[cfg(feature = "smallvec")]
 use smallvec::SmallVec;
 
+use crate::MoveType;
 #[cfg(not(feature = "piececolourboard"))]
 pub(crate) use crate::chessboard::pieceboard::PieceBoard;
 
@@ -280,6 +281,41 @@ impl ChessGame {
     pub fn update_state(&mut self, chess_move: &ChessMove) {
         self.chessboard.update_state(chess_move);
         self.zobrist_table.push(self.chessboard.hash());
+    }
+
+    pub fn parse_move(&self, move_str: &str) -> ChessMove {
+        //eprintln!("move_str: {:?}", move_str);
+        //eprintln!("&move_str[0..1]: {:?}", &move_str[0..1]);
+        //eprintln!("&move_str[2..3]: {:?}", &move_str[2..3]);
+        let (source, target) = (Square::parse_str(&move_str[0..=1]), Square::parse_str(&move_str[2..=3]));
+        /* castling-moves */
+        match (source, target, matches!(self.chessboard.mailbox.square_index(source), Some(ChessPiece(_, PieceType::King)))) {
+            (Square::W_KING_SQUARE, Square::W_KINGSIDE_CASTLE_SQUARE, true) => return ChessMove::W_KINGSIDE_CASTLE,
+            (Square::W_KING_SQUARE, Square::W_QUEENSIDE_CASTLE_SQUARE, true) => return ChessMove::W_QUEENSIDE_CASTLE,
+            (Square::B_KING_SQUARE, Square::B_KINGSIDE_CASTLE_SQUARE, true) => return ChessMove::B_KINGSIDE_CASTLE,
+            (Square::B_KING_SQUARE, Square::B_QUEENSIDE_CASTLE_SQUARE, true) => return ChessMove::B_QUEENSIDE_CASTLE,
+            (source, target, _) => {
+                /* promotion-moves */
+                if move_str.len() == 5 {
+                    let piece = match move_str.chars().nth(4) {
+                        Some('q') => PieceType::Queen,
+                        Some('n') => PieceType::Knight,
+                        Some('r') => PieceType::Rook,
+                        Some('b') => PieceType::Bishop,
+                        _ => panic!("invalid promotion piece"),
+                    };
+                    return ChessMove::new(source, target, MoveType::Promotion(piece));
+                }
+                /* enpassant-moves */
+                match self.chessboard.piece_bitboard(ChessPiece(self.side(), PieceType::Pawn)).nth_is_not_zero(source)
+                    && self.chessboard.piece_bitboard(ChessPiece(self.side().update(), PieceType::Pawn)).nth_is_zero(target)
+                    && self.chessboard.data.enpassant_bb.nth_is_not_zero(target)
+                {
+                    true => return ChessMove::new(source, target, MoveType::EnPassant),
+                    false => return ChessMove::new(source, target, MoveType::Normal),
+                }
+            }
+        }
     }
 }
 

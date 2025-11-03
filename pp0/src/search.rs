@@ -57,6 +57,9 @@ impl NodeLimit {
         let hard_limit = NonZero::new(hard_limit).expect("node soft_limit cannot be zero!");
         NodeLimit { soft_limit, hard_limit }
     }
+    pub fn data(&self) -> (usize, usize) {
+        (self.soft_limit.get(), self.hard_limit.get())
+    }
 }
 
 impl SearchLimit {
@@ -101,6 +104,10 @@ impl SearchData {
 
     pub const fn node_count(&self) -> usize {
         self.node_count
+    }
+
+    pub const fn is_aborted(&self) -> bool {
+        self.is_aborted
     }
 
     pub fn pairs(self) -> Option<((SparseVec, SparseVec), i16)> {
@@ -288,20 +295,22 @@ impl SearchData {
                     chessbb::Side::White => (chessgame.to_sparse_vec_white(), chessgame.to_sparse_vec_black()),
                     chessbb::Side::Black => (chessgame.to_sparse_vec_black(), chessgame.to_sparse_vec_white()),
                 };
-                self.pairs = Some((input, ev.eval(&chessgame)));
+                self.pairs = Some((input, self.negamax::<false, false>(chessgame, i16::MIN + 1, i16::MAX - 1, d.get(), ev, tt.clone(), None, None)));
             }
             return moves[0];
         }
 
         let mut best_eval: i16 = i16::MIN + 1;
         let mut best_move: ChessMove = moves[0].clone();
-        for chess_move in moves {
-            let snapshot = chessgame.explore_state(&chess_move);
+        for chessmove in moves {
+            ev.update(&chessgame, &chessmove);
+            let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&chessmove);
             let eval: i16 = -self.negamax::<false, false>(chessgame, best_eval, i16::MAX - 1, d.get() - 1, ev, tt.clone(), None, None);
             chessgame.restore_state(snapshot);
+            ev.revert(&chessgame, &chessmove);
 
             if eval > best_eval {
-                best_move = chess_move;
+                best_move = chessmove;
                 best_eval = eval;
             }
         }
@@ -320,10 +329,6 @@ impl SearchData {
         &mut self, chessgame: &mut ChessGame, a: i16, b: i16, d: usize, ev: &mut impl Evaluator, tt: Arc<TT>, time_limit: Option<(Instant, Duration)>,
         node_limit: Option<NonZero<usize>>,
     ) -> i16 {
-        if d == 0 {
-            return ev.eval(&chessgame);
-        }
-
         let (chessmoves, gamestate) = chessgame.try_generate_moves();
 
         if let GameState::Finished(state) = gamestate {
@@ -335,6 +340,9 @@ impl SearchData {
             }
         }
 
+        if d == 0 {
+            return ev.eval(&chessgame);
+        }
         let mut alpha: i16 = a;
         let mut best_value: i16 = i16::MIN + 1;
         //let mut best_move: Option<ChessMove> = None;
@@ -369,8 +377,8 @@ impl SearchData {
             self.ply += 1;
             let value: i16 = -self.negamax::<IS_TIME_LIMITED, IS_NODE_LIMITED>(chessgame, -b, -alpha, d - 1, ev, tt.clone(), time_limit, node_limit);
             self.ply -= 1;
-            ev.revert(&chessgame, &chessmove);
             chessgame.restore_state(snapshot);
+            ev.revert(&chessgame, &chessmove);
 
             if value > best_value {
                 best_value = value;
