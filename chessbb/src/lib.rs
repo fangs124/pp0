@@ -24,4 +24,4 @@ pub use crate::chesspiece::{ChessPiece, PieceType, Side};
 pub use crate::square::Square;
 
 #[cfg(feature = "nnue")]
-pub use crate::nnue::{castle_index, index};
+pub use crate::nnue::{castle_index, index, index_pair};

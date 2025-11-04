@@ -50,13 +50,19 @@ impl SparseInputType for ChessGame {
         return vector;
     }
 }
+pub const fn index_pair(chesspiece: ChessPiece, square: Square) -> (usize, usize) {
+    let (piece_side, piece_type) = chesspiece.data();
+    let index_w = (piece_side as usize * 64 * 6) + (piece_type as usize * 64) + square.as_usize();
+    let index_b = ((1 - piece_side as usize) * 64 * 6) + (piece_type as usize * 64) + square.as_usize_flipped();
+    (index_w, index_b)
+}
 
 pub const fn index(chesspiece: ChessPiece, square: Square, side: Side) -> usize {
     let (piece_side, piece_type) = chesspiece.data();
 
     match side {
         Side::White => (piece_side as usize * 64 * 6) + (piece_type as usize * 64) + square.as_usize(),
-        Side::Black => (piece_side.update() as usize * 64 * 6) + (piece_type as usize * 64) + square.as_usize_flipped(),
+        Side::Black => ((1 - piece_side as usize) * 64 * 6) + (piece_type as usize * 64) + square.as_usize_flipped(),
     }
 }
 

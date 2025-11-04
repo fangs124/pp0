@@ -1,4 +1,4 @@
-use chessbb::{ChessBoard, ChessGame, ChessMove, ChessPiece, MoveType, PieceType, Side, Square, castle_index, index};
+use chessbb::{ChessBoard, ChessGame, ChessMove, ChessPiece, MoveType, PieceType, Side, Square, castle_index, index_pair, index};
 use nnue::Network;
 
 pub trait Evaluator {
@@ -21,149 +21,139 @@ pub const STATIC_EVAL: StaticEvaluator = StaticEvaluator;
 
 impl Evaluator for Network {
     fn eval(&mut self, chessgame: &ChessGame) -> i16 {
-        //self.initialize(chessgame);
-        //self.refresh_accumulator_sparse(chessgame);
         match chessgame.side() {
             Side::White => (self.eval::<true>() * 2000.0 ) as i16,
             Side::Black => (self.eval::<false>() * 2000.0 ) as i16,
         }
         
     }
-
-    fn update(&mut self, chessgame: &ChessGame, chessmove: &ChessMove) {  
+     fn update(&mut self, chessgame: &ChessGame, chessmove: &ChessMove) {  
         let side = chessgame.side();
         let source_square = chessmove.source();
-        let source_piece = chessgame.square_index(chessmove.source()).unwrap();
-        let sub_index_w = index(source_piece, source_square, Side::White);
-        let sub_index_b = index(source_piece, source_square, Side::Black);
+        let source_piece = chessgame.square_index(source_square).unwrap();
+        //lift source piece
+        let (s_w, s_b) = index_pair(source_piece, source_square);
         match chessmove.move_type() {
             MoveType::Normal => {
+                //place source piece
                 let target_square = chessmove.target();
-                let add_index_w = index(source_piece, target_square, Side::White);
-                let add_index_b = index(source_piece, target_square, Side::Black);
+                let (a_w, a_b) = index_pair(source_piece, target_square);
                 match chessgame.square_index(chessmove.target()) {
                     Some(target_piece) => {
-                        let sub_index2_w = index(target_piece, target_square, Side::White);
-                        let sub_index2_b = index(target_piece, target_square, Side::Black);
-                        self.accumulator_addsubsub::<true>(add_index_w, sub_index_w, sub_index2_w);
-                        self.accumulator_addsubsub::<false>(add_index_b, sub_index_b, sub_index2_b);
+                        //remove captured piece
+                        let (s2_w, s2_b) = index_pair(target_piece, target_square);
+                        self.accumulators_addsubsub(a_w, s_w, s2_w, a_b, s_b, s2_b);
                     }
                     None => {
-                        self.accumulator_addsub::<true>(add_index_w, sub_index_w);
-                        self.accumulator_addsub::<false>(add_index_b, sub_index_b);
+                        self.accumulators_addsub(a_w, s_w, a_b, s_b);
                     }
                 }
             },
 
             MoveType::Castle(castling) => {
-                let [k_sub, k_add, r_sub, r_add] = castle_index(castling, Side::White);
-                self.accumulator_addsub::<true>(k_add, k_sub);
-                self.accumulator_addsub::<true>(r_add, r_sub);
-                let [k_sub, k_add, r_sub, r_add] = castle_index(castling, Side::Black);
-                self.accumulator_addsub::<false>(k_add, k_sub);
-                self.accumulator_addsub::<false>(r_add, r_sub);
+                let [k_sub_w, k_add_w, r_sub_w, r_add_w] = castle_index(castling, Side::White);
+                let [k_sub_b, k_add_b, r_sub_b, r_add_b] = castle_index(castling, Side::Black);
+                
+                //move king
+                self.accumulators_addsub(k_add_w, k_sub_w, k_add_b, k_sub_b);
+                //move rook
+                self.accumulators_addsub(r_add_w, r_sub_w, r_add_b, r_sub_b);
             },
 
             MoveType::EnPassant => {
+                //place source piece
                 let target_square = chessmove.target();
-                let add_index_w = index(source_piece, target_square, Side::White);
-                let add_index_b = index(source_piece, target_square, Side::Black);
+                let (a_w, a_b) = index_pair(source_piece, target_square);
+                //remove captured piece
                 let victim_square: Square = match side {
                     Side::White => chessmove.target().down(),
                     Side::Black => chessmove.target().up(),
                 };
                 let victim_piece = chessgame.square_index(victim_square).unwrap();
-                let sub_index2_w = index(victim_piece, victim_square, Side::White);
-                let sub_index2_b = index(victim_piece, victim_square, Side::Black);
-                self.accumulator_addsubsub::<true>(add_index_w, sub_index_w, sub_index2_w);
-                self.accumulator_addsubsub::<false>(add_index_b, sub_index_b, sub_index2_b);
+                let (s2_w, s2_b) = index_pair(victim_piece, victim_square);
+                self.accumulators_addsubsub(a_w, s_w, s2_w, a_b, s_b, s2_b);
             },
 
             MoveType::Promotion(piece_type) => {
+                //place promoted piece
                 let promotion_piece = ChessPiece::new(side, piece_type);
                 let target_square = chessmove.target();
-                let add_index_w = index(promotion_piece, target_square, Side::White);
-                let add_index_b = index(promotion_piece, target_square, Side::Black);
+                let (a_w, a_b) = index_pair(promotion_piece, target_square);
                 match chessgame.square_index(chessmove.target()) {
                     Some(target_piece) => {
-                        let sub_index2_w = index(target_piece, target_square, Side::White);
-                        let sub_index2_b = index(target_piece, target_square, Side::Black);
-                        self.accumulator_addsubsub::<true>(add_index_w, sub_index_w, sub_index2_w);
-                        self.accumulator_addsubsub::<false>(add_index_b, sub_index_b, sub_index2_b);
+                        //remove captured piece
+                        let (s2_w, s2_b) = index_pair(target_piece, target_square);
+                        self.accumulators_addsubsub(a_w, s_w, s2_w, a_b, s_b, s2_b);
                     }
                     None => {
-                        self.accumulator_addsub::<true>(add_index_w, sub_index_w);
-                        self.accumulator_addsub::<false>(add_index_b, sub_index_b);
+                        self.accumulators_addsub(a_w, s_w, a_b, s_b);
                     }
                 }
             },
         }
     }
+
     
     fn revert(&mut self, chessgame: &ChessGame, chessmove: &ChessMove) {
         let side = chessgame.side();
+        //lift source piece
         let source_square = chessmove.source();
-        let source_piece = chessgame.square_index(chessmove.source()).unwrap();
-        let sub_index_w = index(source_piece, source_square, Side::White);
-        let sub_index_b = index(source_piece, source_square, Side::Black);
+        let source_piece = chessgame.square_index(source_square).unwrap();
+        let (s_w, s_b) = index_pair(source_piece, source_square);
         match chessmove.move_type() {
             MoveType::Normal => {
+                //place source piece
                 let target_square = chessmove.target();
-                let add_index_w = index(source_piece, target_square, Side::White);
-                let add_index_b = index(source_piece, target_square, Side::Black);
+                let (a_w, a_b) = index_pair(source_piece, target_square);
                 match chessgame.square_index(chessmove.target()) {
                     Some(target_piece) => {
-                        let sub_index2_w = index(target_piece, target_square, Side::White);
-                        let sub_index2_b = index(target_piece, target_square, Side::Black);
-                        self.accumulator_addaddsub::<true>( sub_index_w, sub_index2_w, add_index_w);
-                        self.accumulator_addaddsub::<false>( sub_index_b, sub_index2_b, add_index_b);
+                        //remove captured piece
+                        let (s2_w, s2_b) = index_pair(target_piece, target_square);
+                        self.accumulators_addaddsub( s_w, s2_w, a_w, s_b, s2_b, a_b);
                     }
                     None => {
-                        self.accumulator_addsub::<true>(sub_index_w, add_index_w);
-                        self.accumulator_addsub::<false>(sub_index_b, add_index_b);
+                        self.accumulators_addsub(s_w, a_w, s_b, a_b);
                     }
                 }
             },
 
             MoveType::Castle(castling) => {
-                let [k_sub, k_add, r_sub, r_add] = castle_index(castling, Side::White);
-                self.accumulator_addsub::<true>( k_sub, k_add);
-                self.accumulator_addsub::<true>( r_sub, r_add);
-                let [k_sub, k_add, r_sub, r_add] = castle_index(castling, Side::Black);
-                self.accumulator_addsub::<false>( k_sub, k_add);
-                self.accumulator_addsub::<false>( r_sub, r_add);
+                let [k_sub_w, k_add_w, r_sub_w, r_add_w] = castle_index(castling, Side::White);
+                let [k_sub_b, k_add_b, r_sub_b, r_add_b] = castle_index(castling, Side::Black);
+                
+                //move king
+                self.accumulators_addsub(k_sub_w, k_add_w, k_sub_b, k_add_b);
+                //move rook
+                self.accumulators_addsub(r_sub_w, r_add_w, r_sub_b, r_add_b);
             },
 
             MoveType::EnPassant => {
+                //place source piece
                 let target_square = chessmove.target();
-                let add_index_w = index(source_piece, target_square, Side::White);
-                let add_index_b = index(source_piece, target_square, Side::Black);
+                let (a_w, a_b) = index_pair(source_piece, target_square);
+                //remove captured piece
                  let victim_square: Square = match side {
                     Side::White => chessmove.target().down(),
                     Side::Black => chessmove.target().up(),
                 };
                 let victim_piece = chessgame.square_index(victim_square).unwrap();
-                let sub_index2_w = index(victim_piece, victim_square, Side::White);
-                let sub_index2_b = index(victim_piece, victim_square, Side::Black);
-                self.accumulator_addaddsub::<true>( sub_index_w, sub_index2_w, add_index_w);
-                self.accumulator_addaddsub::<false>( sub_index_b, sub_index2_b, add_index_b);
+                let (s2_w, s2_b) = index_pair(victim_piece, victim_square);
+                self.accumulators_addaddsub( s_w, s2_w, a_w, s_b, s2_b, a_b);
             },
 
             MoveType::Promotion(piece_type) => {
+                //place promoted piece
                 let promotion_piece = ChessPiece::new(side, piece_type);
                 let target_square = chessmove.target();
-                let add_index_w = index(promotion_piece, target_square, Side::White);
-                let add_index_b = index(promotion_piece, target_square, Side::Black);
+                let (a_w, a_b) = index_pair(promotion_piece, target_square);
                 match chessgame.square_index(chessmove.target()) {
                     Some(target_piece) => {
-                        let sub_index2_w = index(target_piece, target_square, Side::White);
-                        let sub_index2_b = index(target_piece, target_square, Side::Black);
-                        self.accumulator_addaddsub::<true>( sub_index_w, sub_index2_w, add_index_w);
-                        self.accumulator_addaddsub::<false>( sub_index_b, sub_index2_b, add_index_b);
+                        //remove captured piece
+                        let (s2_w, s2_b) = index_pair(target_piece, target_square);
+                        self.accumulators_addaddsub( s_w, s2_w, a_w, s_b, s2_b, a_b);
                     }
                     None => {
-                        self.accumulator_addsub::<true>( sub_index_w, add_index_w);
-                        self.accumulator_addsub::<false>( sub_index_b, add_index_b);
+                        self.accumulators_addsub( s_w, a_w, s_b, a_b);
                     }
                 }
             },

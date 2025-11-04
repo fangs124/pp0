@@ -335,7 +335,7 @@ impl SearchData {
         if let GameState::Finished(state) = gamestate {
             match state {
                 GameResult::Win(_) => {
-                    return LOSE_SCORE + (self.ply as i16); //TODO determine if +d or -d or something else should be used here.
+                    return LOSE_SCORE + (self.ply as i16);
                 }
                 GameResult::Draw => return 0,
             }
@@ -345,7 +345,7 @@ impl SearchData {
             return ev.eval(&chessgame);
         }
         let mut alpha: i16 = a;
-        let mut best_value: i16 = i16::MIN + 1;
+        let mut best_score: i16 = i16::MIN + 1;
         //let mut best_move: Option<ChessMove> = None;
         for chessmove in chessmoves {
             //chef: only check every 1024 node
@@ -353,8 +353,8 @@ impl SearchData {
                 let node_limit = unsafe { node_limit.unwrap_unchecked() };
                 if node_limit.get() > self.node_count {
                     self.is_aborted = true;
-                    return match best_value >= b {
-                        true => best_value,
+                    return match best_score >= b {
+                        true => best_score,
                         false => i16::MIN + 1,
                     };
                 }
@@ -364,8 +364,8 @@ impl SearchData {
                 let time_limit = unsafe { time_limit.unwrap_unchecked() };
                 if time_limit.0.elapsed() >= time_limit.1 {
                     self.is_aborted = true;
-                    return match best_value >= b {
-                        true => best_value,
+                    return match best_score >= b {
+                        true => best_score,
                         false => i16::MIN + 1,
                     };
                 }
@@ -376,18 +376,17 @@ impl SearchData {
             ev.update(&chessgame, &chessmove);
             let snapshot: ChessBoardSnapshot = chessgame.explore_state(&chessmove);
             self.ply += 1;
-            let value: i16 = -self.negamax::<IS_TIME_LIMITED, IS_NODE_LIMITED>(chessgame, -b, -alpha, d - 1, ev, tt.clone(), time_limit, node_limit);
+            let score: i16 = -self.negamax::<IS_TIME_LIMITED, IS_NODE_LIMITED>(chessgame, -b, -alpha, d - 1, ev, tt.clone(), time_limit, node_limit);
             self.ply -= 1;
             chessgame.restore_state(snapshot);
             ev.revert(&chessgame, &chessmove);
 
-            if value > best_value {
-                best_value = value;
-                //best_move = Some(chess_move);
+            if score > best_score {
+                best_score = score;
             }
 
-            if value > alpha {
-                alpha = value;
+            if score > alpha {
+                alpha = score;
             }
 
             if alpha >= b {
@@ -395,6 +394,6 @@ impl SearchData {
             }
         }
 
-        best_value
+        best_score
     }
 }

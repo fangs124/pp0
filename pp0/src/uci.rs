@@ -35,9 +35,13 @@ pub fn uci_loop(net: &mut Network) -> io::Result<()> {
                     println!("id author Fangs");
                     println!("uciok");
                 }
-                "position" => uci_position(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), &mut last_fen),
+                "position" => {
+                    uci_position(&mut chessgame, cmds.collect::<Vec<&str>>().join(" ").as_str(), &mut last_fen);
+                    net.initialize(&chessgame);
+                }
                 "ucinewgame" => {
                     chessgame = ChessGame::start_pos();
+                    net.initialize(&chessgame);
                     tt = Arc::new(TT::new());
                     last_fen = Vec::<String>::new();
                 }

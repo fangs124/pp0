@@ -90,7 +90,7 @@ pub fn play<const COLLECT_PAIRS: bool>(player1: &mut Player, player2: &mut Playe
 
         let chess_move: ChessMove = match p1_white == (side == Side::White) {
             true => {
-                //player1.evaluator.initialize(&chessgame);
+                player1.evaluator.initialize(&chessgame);
                 let chess_move = search_data.find_move(&mut chessgame, &mut player1.evaluator, tt1.clone(), &player1.search_limit, moves);
                 node_count_p1_total += search_data.node_count();
                 if COLLECT_PAIRS {
@@ -101,13 +101,13 @@ pub fn play<const COLLECT_PAIRS: bool>(player1: &mut Player, player2: &mut Playe
                 chess_move
             }
             false => {
-                //player2.evaluator.initialize(&chessgame);
+                player2.evaluator.initialize(&chessgame);
                 let chess_move = search_data.find_move(&mut chessgame, &mut player2.evaluator, tt2.clone(), &player2.search_limit, moves);
                 chess_move
             }
         };
-        player1.evaluator.update(&chessgame, &chess_move);
-        player2.evaluator.update(&chessgame, &chess_move);
+        //player1.evaluator.update(&chessgame, &chess_move);
+        //player2.evaluator.update(&chessgame, &chess_move);
         chessgame.update_state(&chess_move);
         (moves, game_state) = chessgame.try_generate_moves();
     };
@@ -117,88 +117,5 @@ pub fn play<const COLLECT_PAIRS: bool>(player1: &mut Player, player2: &mut Playe
         false => Side::Black,
     };
 
-    MatchResult { result, p1_side: net_side, node_count: node_count_p1_total, pairs }
-}
-
-pub fn debug_play<const COLLECT_PAIRS: bool>(
-    player1: &mut Player, player2: &mut Player, fen: Option<&str>, p1_white: bool, debug_file_buf: Arc<Mutex<BufWriter<&File>>>,
-) -> MatchResult {
-    //net is white
-    let mut chessgame: ChessGame = match fen {
-        Some(fen) => ChessGame::from_fen(&fen),
-        None => ChessGame::start_pos(),
-    };
-    let fen = fen.unwrap();
-    let mut debug_file_buf = debug_file_buf.lock().unwrap();
-    _ = writeln!(debug_file_buf, "[FEN \"{}\"]", fen);
-    //let fen = { opening_book.lock().unwrap()[random_range(0..opening_book_len)].clone() };
-    //scoreboard.write_to_buf(&mut log_file_buff)?;
-    //log_file_buff.flush()?;
-    player1.evaluator.initialize(&chessgame);
-    player2.evaluator.initialize(&chessgame);
-
-    let (mut moves, mut game_state) = chessgame.try_generate_moves();
-    assert!(!moves.is_empty());
-
-    let mut pairs: Option<Vec<((SparseVec, SparseVec), i16)>> = match COLLECT_PAIRS {
-        true => Some(Vec::new()),
-        false => None,
-    };
-
-    let tt1: Arc<TranspositionTable> = Arc::new(TranspositionTable::new());
-    let tt2: Arc<TranspositionTable> = Arc::new(TranspositionTable::new());
-
-    let mut node_count_p1_total: usize = 0;
-
-    // play game
-    let result: GameResult = loop {
-        if let GameState::Finished(result) = game_state {
-            break result;
-        }
-
-        let side: Side = chessgame.side();
-
-        let mut search_data: SearchData = match COLLECT_PAIRS {
-            true => SearchData::new_collect_pairs(),
-            false => SearchData::new(),
-        };
-
-        let chessmove: ChessMove = match p1_white == (side == Side::White) {
-            true => {
-                //player1.evaluator.initialize(&chessgame);
-                let chess_move = search_data.find_move(&mut chessgame, &mut player1.evaluator, tt1.clone(), &player1.search_limit, moves);
-                node_count_p1_total += search_data.node_count();
-                if COLLECT_PAIRS {
-                    if let Some(pairs) = &mut pairs {
-                        pairs.push(search_data.pairs().unwrap());
-                    }
-                }
-                chess_move
-            }
-            false => {
-                //player2.evaluator.initialize(&chessgame);
-                let chess_move = search_data.find_move(&mut chessgame, &mut player2.evaluator, tt2.clone(), &player2.search_limit, moves);
-                chess_move
-            }
-        };
-        _ = writeln!(debug_file_buf, "{}", chessmove.print_move());
-        player1.evaluator.update(&chessgame, &chessmove);
-        player2.evaluator.update(&chessgame, &chessmove);
-        chessgame.update_state(&chessmove);
-        (moves, game_state) = chessgame.try_generate_moves();
-    };
-
-    let net_side: Side = match p1_white {
-        true => Side::White,
-        false => Side::Black,
-    };
-    if let GameState::Finished(result) = game_state {
-        match result {
-            GameResult::Win(Side::White) => _ = writeln!(debug_file_buf, "White Wins!"),
-            GameResult::Win(Side::Black) => _ = writeln!(debug_file_buf, "Black Wins!"),
-            GameResult::Draw => _ = writeln!(debug_file_buf, "Draw!"),
-        }
-    };
-    drop(debug_file_buf);
     MatchResult { result, p1_side: net_side, node_count: node_count_p1_total, pairs }
 }

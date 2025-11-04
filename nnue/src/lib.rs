@@ -27,8 +27,8 @@ pub const INPUT_DIMENSION: usize = INP;
 pub use grad::Gradient;
 
 const INP: usize = 768;
-const ACC: usize = 512;
-const HID: usize = 16;
+const ACC: usize = 1024;
+const HID: usize = 8;
 const OUT: usize = 1;
 
 pub trait InputType {
@@ -167,48 +167,36 @@ impl Network {
     }
 
     //corresponds to moving a piece
-    pub fn accumulator_addsub<const IS_WHITE: bool>(&mut self, add_index: usize, sub_index: usize) {
-        let accumulator = match IS_WHITE {
-            true => &mut self.accumulator_w,
-            false => &mut self.accumulator_b,
-        };
+    pub fn accumulators_addsub(&mut self, a_w: usize, s_w: usize, a_b: usize, s_b: usize) {
         let mut i = 0;
         while i < ACC {
             //m[(r,c)]
-            accumulator[i] = self.input.w[(i, add_index)] - self.input.w[(i, sub_index)];
+            self.accumulator_w[i] += self.input.w[(i, a_w)] - self.input.w[(i, s_w)];
+            self.accumulator_b[i] += self.input.w[(i, a_b)] - self.input.w[(i, s_b)];
             i += 1;
         }
-        //*accumulator += self.input.w.column(add_index) - self.input.w.column(sub_index);
     }
 
     //corresponds to capturing a piece
-    pub fn accumulator_addsubsub<const IS_WHITE: bool>(&mut self, add_index: usize, sub_index1: usize, sub_index2: usize) {
-        let accumulator = match IS_WHITE {
-            true => &mut self.accumulator_w,
-            false => &mut self.accumulator_b,
-        };
+    pub fn accumulators_addsubsub(&mut self, a_w: usize, s_w: usize, s2_w: usize, a_b: usize, s_b: usize, s2_b: usize) {
         let mut i = 0;
         while i < ACC {
             //m[(r,c)]
-            accumulator[i] = self.input.w[(i, add_index)] - self.input.w[(i, sub_index1)] - self.input.w[(i, sub_index2)];
+            self.accumulator_w[i] += self.input.w[(i, a_w)] - self.input.w[(i, s_w)] - self.input.w[(i, s2_w)];
+            self.accumulator_b[i] += self.input.w[(i, a_b)] - self.input.w[(i, s_b)] - self.input.w[(i, s2_b)];
             i += 1;
         }
-        //*accumulator += self.input.w.column(add_index) - self.input.w.column(sub_index1) - self.input.w.column(sub_index2);
     }
 
-    //corresponds to capturing a piece
-    pub fn accumulator_addaddsub<const IS_WHITE: bool>(&mut self, add_index1: usize, add_index2: usize, sub_index: usize) {
-        let accumulator = match IS_WHITE {
-            true => &mut self.accumulator_w,
-            false => &mut self.accumulator_b,
-        };
+    //corresponds to uncapturing a piece
+    pub fn accumulators_addaddsub(&mut self, a1_w: usize, a2_w: usize, s_w: usize, a1_b: usize, a2_b: usize, s_b: usize) {
         let mut i = 0;
         while i < ACC {
             //m[(r,c)]
-            accumulator[i] = self.input.w[(i, add_index1)] + self.input.w[(i, add_index2)] - self.input.w[(i, sub_index)];
+            self.accumulator_w[i] += self.input.w[(i, a1_w)] + self.input.w[(i, a2_w)] - self.input.w[(i, s_w)];
+            self.accumulator_b[i] += self.input.w[(i, a1_b)] + self.input.w[(i, a2_b)] - self.input.w[(i, s_b)];
             i += 1;
         }
-        //*accumulator += self.input.w.column(add_index1) + self.input.w.column(add_index2) - self.input.w.column(sub_index);
     }
 
     pub fn refresh_accumulator(&mut self, input: &impl InputType) {
@@ -222,8 +210,8 @@ impl Network {
         let input_black = input.to_sparse_vec_black();
         let w = self.input.w;
 
-        self.accumulator_w = input_white.into_iter().fold(self.accumulator_w.clone(), |sum, i| sum + w.column(i));
-        self.accumulator_b = input_black.into_iter().fold(self.accumulator_b.clone(), |sum, i| sum + w.column(i));
+        self.accumulator_w = input_white.into_iter().fold(self.input.b.clone(), |sum, i| sum + w.column(i));
+        self.accumulator_b = input_black.into_iter().fold(self.input.b.clone(), |sum, i| sum + w.column(i));
     }
 
     #[cfg(feature = "arrayvec")]

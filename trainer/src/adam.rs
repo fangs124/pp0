@@ -1,6 +1,6 @@
 use chessbb::{GameResult, Side};
 use nalgebra::{DVector, SVector};
-use nnue::{Network, Gradient};
+use nnue::{Gradient, Network};
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, AtomicU8};
 use std::{
@@ -21,19 +21,16 @@ use termion::{
 use crate::{LAMBDA, LEARNING_RATE, LOOP_COUNT_CHECK_LIMIT, simulation::MatchResult};
 
 pub fn sgd(net: &mut Network, results: Vec<MatchResult>) {
-    let mut i: usize = 0;
     for result in results {
         let grad = game_gradient(net, result);
         let reg = net.regularization_term(LAMBDA);
         net.update_grad(grad + reg, -LEARNING_RATE);
-
-        i += 1;
     }
 }
 
 pub fn adam_single_threaded(net: &mut Network, results: Vec<MatchResult>, beta1: f32, beta2: f32, m: &mut Gradient, v: &mut Gradient) {
-    let mut m_grad = m.clone();
-    let mut v_grad = v.clone();
+    let mut m_grad = Gradient::zeros();
+    let mut v_grad = Gradient::zeros();
 
     let mut i: usize = 0;
     for result in results {
@@ -43,11 +40,9 @@ pub fn adam_single_threaded(net: &mut Network, results: Vec<MatchResult>, beta1:
         v_grad = beta2 * v_grad + (1.0 - beta2) * grad.component_square();
 
         let reg = net.regularization_term(LAMBDA);
-        net.update_grad(Gradient::adam(beta1, beta2, i, &m, &v) + reg, -LEARNING_RATE);
+        net.update_grad(Gradient::adam(beta1, beta2, i, &m_grad, &v_grad) + reg, -LEARNING_RATE);
         i += 1;
     }
-    *m = m_grad;
-    *v = v_grad;
 }
 
 const GRADIENT_MINIBATCH: usize = 1000;

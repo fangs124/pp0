@@ -24,7 +24,7 @@ use crate::{
     adam::{adam_single_threaded, sgd},
     player::{Epoch, Player, PlayerEvaluator},
     scoreboard::ScoreBoard,
-    simulation::{MatchResult, PairResult, debug_play, play},
+    simulation::{MatchResult, PairResult, play},
 };
 use chessbb::{ChessGame, GameResult, Side};
 use inquire::Select;
@@ -52,9 +52,9 @@ enum LoopState {
 }
 
 const LEARNING_RATE: f32 = 0.001; //0.001
-const LAMBDA: f32 = 0.01;
+const LAMBDA: f32 = 0.1;
 const BETA1: f32 = 0.9;
-const BETA2: f32 = 0.99;
+const BETA2: f32 = 0.999;
 const MAX_DEPTH_LIMIT: usize = 3;
 const BATCH_SIZE: usize = 10000; //the games played is doubled this
 const PREVIOUS_FILENAME: &str = "prv.nnue";
@@ -106,6 +106,7 @@ fn main() -> std::io::Result<()> {
 const DEBUG_COLLECT_HISTORY: bool = true;
 const DEBUG_GAMES_TOTAL: usize = 5;
 static DEBUG_GAMES_COLLECTED: AtomicUsize = AtomicUsize::new(0);
+static DEBUG_GRADIENT_COLLECTED: AtomicUsize = AtomicUsize::new(0);
 const LOOP_COUNT_CHECK_LIMIT: usize = 4194304 / 4;
 fn train(net: &mut Network) -> std::io::Result<()> {
     let mut m: Gradient = Gradient::zeros();
@@ -290,7 +291,8 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                     adam_single_threaded(net, results, BETA1, BETA2, &mut m, &mut v);
                     //adam(net, results, BETA1, BETA2, &mut m, &mut v)?;
                     //update net, gradient stuff here
-                    batch_size = BATCH_SIZE / 4;
+                    player1.evaluator = PlayerEvaluator::Network(net.clone());
+                    batch_size = BATCH_SIZE / 5;
                     results = Vec::new();
                     loop_state = LoopState::Review;
                 }
@@ -311,6 +313,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                             && d.get() < MAX_DEPTH_LIMIT
                         {
                             player2.search_limit = SearchLimit::Depth(d.saturating_add(1));
+                            scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
                         } else {
                             if !is_stronger_than_mat_eval {
                                 is_stronger_than_mat_eval = true;
