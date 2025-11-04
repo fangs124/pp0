@@ -14,7 +14,7 @@ impl Index<Square> for [Bitboard; 64] {
 
     #[inline(always)]
     fn index(&self, index: Square) -> &Self::Output {
-        &self[index.to_usize()]
+        &self[index.as_usize()]
     }
 }
 
@@ -28,51 +28,81 @@ const ROOK_ATTACKS: [Bitboard; 64] = init_rook_attack();
 #[inline(always)]
 pub(crate) const fn get_pawn_attack(side: Side, square: Square) -> Bitboard {
     match side {
-        Side::White => W_PAWN_ATTACKS[square.to_usize()],
-        Side::Black => B_PAWN_ATTACKS[square.to_usize()],
+        Side::White => W_PAWN_ATTACKS[square.as_usize()],
+        Side::Black => B_PAWN_ATTACKS[square.as_usize()],
     }
 }
 
 #[inline(always)]
+pub(crate) fn get_pawn_quiet(side: Side, square: Square, blockers: &Bitboard) -> Bitboard {
+    let mut quiet_moves = match side {
+        Side::White => Bitboard::nth(square.up()).bit_and(&blockers.bit_not()),
+        Side::Black => Bitboard::nth(square.down()).bit_and(&blockers.bit_not()),
+    };
+
+    if quiet_moves.is_not_zero() && (square.as_row_usize() == STARTING_ROWS[side as usize]) {
+        quiet_moves = match side {
+            Side::White => quiet_moves.bit_or(&Bitboard::nth(square.upup()).bit_and(&blockers.bit_not())),
+            Side::Black => quiet_moves.bit_or(&Bitboard::nth(square.downdown()).bit_and(&blockers.bit_not())),
+        };
+
+        quiet_moves = quiet_moves.bit_and(&blockers.bit_not());
+    }
+    return quiet_moves;
+}
+
+const PROMOTION_ROWS: [usize; 2] = [7, 0];
+#[inline(always)]
+pub(crate) const fn promotion_row(side: Side) -> usize {
+    PROMOTION_ROWS[side as usize]
+}
+
+const STARTING_ROWS: [usize; 2] = [1, 6];
+#[inline(always)]
+pub(crate) const fn starting_row(side: Side) -> usize {
+    STARTING_ROWS[side as usize]
+}
+
+#[inline(always)]
 pub(crate) const fn get_w_pawn_attack(square: Square) -> Bitboard {
-    W_PAWN_ATTACKS[square.to_usize()]
+    W_PAWN_ATTACKS[square.as_usize()]
 }
 
 #[inline(always)]
 pub(crate) const fn get_b_pawn_attack(square: Square) -> Bitboard {
-    B_PAWN_ATTACKS[square.to_usize()]
+    B_PAWN_ATTACKS[square.as_usize()]
 }
 
 #[inline(always)]
 pub(crate) const fn get_knight_attack(square: Square) -> Bitboard {
-    KNIGHT_ATTACKS[square.to_usize()]
+    KNIGHT_ATTACKS[square.as_usize()]
 }
 
 #[inline(always)]
 pub(crate) const fn get_king_attack(square: Square) -> Bitboard {
-    KING_ATTACKS[square.to_usize()]
+    KING_ATTACKS[square.as_usize()]
 }
 
 #[inline(always)]
 pub const fn get_bishop_ray(square: Square) -> Bitboard {
-    BISHOP_ATTACKS[square.to_usize()]
+    BISHOP_ATTACKS[square.as_usize()]
 }
 
 #[inline(always)]
 pub const fn get_rook_ray(square: Square) -> Bitboard {
-    ROOK_ATTACKS[square.to_usize()]
+    ROOK_ATTACKS[square.as_usize()]
 }
 
 #[inline(always)]
 pub(crate) const fn get_bishop_attack(square: Square, blockers: Bitboard) -> Bitboard {
-    let m = magic_index(BISHOP_MAGICS[square.to_usize()], blockers.0 & BISHOP_MBB_MASK[square.to_usize()].0, BISHOP_OCC_BITCOUNT[square.to_usize()]);
-    return BISHOP_ATTACKS_MBB[square.to_usize()][m];
+    let m = magic_index(BISHOP_MAGICS[square.as_usize()], blockers.0 & BISHOP_MBB_MASK[square.as_usize()].0, BISHOP_OCC_BITCOUNT[square.as_usize()]);
+    return BISHOP_ATTACKS_MBB[square.as_usize()][m];
 }
 
 #[inline(always)]
 pub(crate) const fn get_rook_attack(square: Square, blockers: Bitboard) -> Bitboard {
-    let m = magic_index(ROOK_MAGICS[square.to_usize()], blockers.0 & ROOK_MBB_MASK[square.to_usize()].0, ROOK_OCC_BITCOUNT[square.to_usize()]);
-    return ROOK_ATTACKS_MBB[square.to_usize()][m];
+    let m = magic_index(ROOK_MAGICS[square.as_usize()], blockers.0 & ROOK_MBB_MASK[square.as_usize()].0, ROOK_OCC_BITCOUNT[square.as_usize()]);
+    return ROOK_ATTACKS_MBB[square.as_usize()][m];
 }
 
 #[inline(always)]
@@ -84,7 +114,12 @@ pub(crate) const fn rays(i: Square, j: Square) -> Bitboard {
     RAYS[i as usize][j as usize]
 }
 
+pub(crate) const fn long_rays(i: Square, j: Square) -> Bitboard {
+    LONG_RAYS[i as usize][j as usize]
+}
+
 static RAYS: [[Bitboard; 64]; 64] = init_rays();
+static LONG_RAYS: [[Bitboard; 64]; 64] = init_long_rays();
 
 const fn init_rays() -> [[Bitboard; 64]; 64] {
     let mut rays: [[Bitboard; 64]; 64] = [[Bitboard::ZERO; 64]; 64];
@@ -99,6 +134,27 @@ const fn init_rays() -> [[Bitboard; 64]; 64] {
                 rays[i][j].0 = get_rook_attack(i_square, squares).0 & get_rook_attack(j_square, squares).0;
             } else if is_same_ddiagonal(i, j) || is_same_adiagonal(i, j) {
                 rays[i][j].0 = get_bishop_attack(i_square, squares).0 & get_bishop_attack(j_square, squares).0;
+            }
+            j += 1;
+        }
+        i += 1;
+    }
+    rays
+}
+
+const fn init_long_rays() -> [[Bitboard; 64]; 64] {
+    let mut rays: [[Bitboard; 64]; 64] = [[Bitboard::ZERO; 64]; 64];
+    let mut i: usize = 0;
+    while i < 64 {
+        let i_square = Square::nth(i);
+        let mut j: usize = 0;
+        while j < 64 {
+            let j_square = Square::nth(j);
+            let squares = Bitboard((1u64 << i) | (1u64 << j));
+            if i / 8 == j / 8 || i % 8 == j % 8 {
+                rays[i][j].0 = (get_rook_attack(i_square, Bitboard::ZERO).0 & get_rook_attack(j_square, Bitboard::ZERO).0) | squares.0;
+            } else if is_same_ddiagonal(i, j) || is_same_adiagonal(i, j) {
+                rays[i][j].0 = (get_bishop_attack(i_square, Bitboard::ZERO).0 & get_bishop_attack(j_square, Bitboard::ZERO).0) | squares.0;
             }
             j += 1;
         }

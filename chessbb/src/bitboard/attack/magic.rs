@@ -86,7 +86,7 @@ const fn compute_occ_bb(index: usize, mask_bitcount: usize, attack_mask: Bitboar
             attack_mask.pop_bit(square_index);
             // check that square is within range of index
             if index & (1 << i) != 0usize {
-                occupancy_bb.0 |= 1u64 << square_index.to_usize()
+                occupancy_bb.0 |= 1u64 << square_index.as_usize()
             }
         }
         i += 1;

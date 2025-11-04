@@ -1,11 +1,16 @@
 use std::slice;
 
+use crate::{
+    Bitboard,
+    bitboard::attack::{get_bishop_attack, get_queen_attack, get_rook_attack},
+    square::Square,
+};
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Side {
     White = 0,
     Black = 1,
 }
-
 #[rustfmt::skip]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PieceType {
@@ -17,8 +22,32 @@ pub enum PieceType {
     King   = 5,
 }
 
+#[rustfmt::skip]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct ChessPiece(pub(crate) Side, pub(crate) PieceType);
+pub enum SliderType { //this seems like an ugly hack
+    Bishop = 2,
+    Rook   = 3,
+    Queen  = 4,
+}
+
+impl From<SliderType> for PieceType {
+    fn from(value: SliderType) -> PieceType {
+        PieceType::PIECES[value as usize]
+    }
+}
+
+impl SliderType {
+    pub(crate) fn get_attack(&self, square: Square, blockers: Bitboard) -> Bitboard {
+        match self {
+            SliderType::Bishop => get_bishop_attack(square, blockers),
+            SliderType::Rook => get_rook_attack(square, blockers),
+            SliderType::Queen => get_queen_attack(square, blockers),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct ChessPiece(pub Side, pub PieceType);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FenError {
@@ -57,7 +86,7 @@ impl TryFrom<char> for ChessPiece {
 }
 
 impl PieceType {
-    const PIECES: [PieceType; 6] = [PieceType::King, PieceType::Queen, PieceType::Knight, PieceType::Bishop, PieceType::Rook, PieceType::Pawn];
+    const PIECES: [PieceType; 6] = [PieceType::Pawn, PieceType::Knight, PieceType::Bishop, PieceType::Rook, PieceType::Queen, PieceType::King];
 
     pub fn iter() -> slice::Iter<'static, PieceType> {
         PieceType::PIECES.iter()
@@ -155,16 +184,16 @@ impl ChessPiece {
         ChessPiece::PIECES.iter()
     }
 
-    pub(crate) const WK: ChessPiece = ChessPiece(Side::White, PieceType::King);
-    pub(crate) const WQ: ChessPiece = ChessPiece(Side::White, PieceType::Queen);
-    pub(crate) const WN: ChessPiece = ChessPiece(Side::White, PieceType::Knight);
-    pub(crate) const WB: ChessPiece = ChessPiece(Side::White, PieceType::Bishop);
-    pub(crate) const WR: ChessPiece = ChessPiece(Side::White, PieceType::Rook);
-    pub(crate) const WP: ChessPiece = ChessPiece(Side::White, PieceType::Pawn);
-    pub(crate) const BK: ChessPiece = ChessPiece(Side::Black, PieceType::King);
-    pub(crate) const BQ: ChessPiece = ChessPiece(Side::Black, PieceType::Queen);
-    pub(crate) const BN: ChessPiece = ChessPiece(Side::Black, PieceType::Knight);
-    pub(crate) const BB: ChessPiece = ChessPiece(Side::Black, PieceType::Bishop);
-    pub(crate) const BR: ChessPiece = ChessPiece(Side::Black, PieceType::Rook);
-    pub(crate) const BP: ChessPiece = ChessPiece(Side::Black, PieceType::Pawn);
+    pub const WK: ChessPiece = ChessPiece(Side::White, PieceType::King);
+    pub const WQ: ChessPiece = ChessPiece(Side::White, PieceType::Queen);
+    pub const WN: ChessPiece = ChessPiece(Side::White, PieceType::Knight);
+    pub const WB: ChessPiece = ChessPiece(Side::White, PieceType::Bishop);
+    pub const WR: ChessPiece = ChessPiece(Side::White, PieceType::Rook);
+    pub const WP: ChessPiece = ChessPiece(Side::White, PieceType::Pawn);
+    pub const BK: ChessPiece = ChessPiece(Side::Black, PieceType::King);
+    pub const BQ: ChessPiece = ChessPiece(Side::Black, PieceType::Queen);
+    pub const BN: ChessPiece = ChessPiece(Side::Black, PieceType::Knight);
+    pub const BB: ChessPiece = ChessPiece(Side::Black, PieceType::Bishop);
+    pub const BR: ChessPiece = ChessPiece(Side::Black, PieceType::Rook);
+    pub const BP: ChessPiece = ChessPiece(Side::Black, PieceType::Pawn);
 }

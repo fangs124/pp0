@@ -2,3 +2,5 @@
 perf.data*
 *.epd
 *.log
+*.nnue
+*.json

@@ -58,3 +58,39 @@ impl Not for Bitboard {
         Bitboard(!self.0)
     }
 }
+
+impl BitAnd for &Bitboard {
+    type Output = Bitboard;
+
+    #[inline(always)]
+    fn bitand(self, rhs: &Bitboard) -> Self::Output {
+        Bitboard(self.0 & rhs.0)
+    }
+}
+
+impl BitOr for &Bitboard {
+    type Output = Bitboard;
+
+    #[inline(always)]
+    fn bitor(self, rhs: &Bitboard) -> Self::Output {
+        Bitboard(self.0 | rhs.0)
+    }
+}
+
+impl BitXor for &Bitboard {
+    type Output = Bitboard;
+
+    #[inline(always)]
+    fn bitxor(self, rhs: &Bitboard) -> Self::Output {
+        Bitboard(self.0 ^ rhs.0)
+    }
+}
+
+impl Not for &Bitboard {
+    type Output = Bitboard;
+
+    #[inline(always)]
+    fn not(self) -> Self::Output {
+        Bitboard(!self.0)
+    }
+}

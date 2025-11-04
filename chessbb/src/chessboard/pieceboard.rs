@@ -9,7 +9,7 @@ use crate::{
 //Pawn, Knight, Bishop Rook, Queen, King
 //White, Black
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub(crate) struct PieceColourBoard {
+pub struct PieceColourBoard {
     pub(crate) piece: [Bitboard; 6],
     pub(crate) colour: [Bitboard; 2],
 }
@@ -50,7 +50,7 @@ impl PieceColourBoard {
         ],
     };
 
-    pub(crate) const fn piece_bitboard(&self, chess_piece: ChessPiece) -> Bitboard {
+    pub const fn piece_bitboard(&self, chess_piece: ChessPiece) -> Bitboard {
         self.colour[chess_piece.0 as usize].bit_and(&self.piece[chess_piece.1 as usize])
     }
 
@@ -62,7 +62,7 @@ impl PieceColourBoard {
         self.colour[1]
     }
 
-    pub(crate) const fn colour_bitboard(&self, side: Side) -> Bitboard {
+    pub(crate) const fn colour_blockers(&self, side: Side) -> Bitboard {
         self.colour[side as usize]
     }
 
@@ -84,7 +84,7 @@ impl PieceColourBoard {
 // pieces: white pawn, white knight, white bishop, white rook, white queen, white king,
 //         black pawn, black knight, black bishop, black rook, black queen, black king,
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) struct PieceBoard([Bitboard; 12]);
+pub struct PieceBoard([Bitboard; 12]);
 impl Index<ChessPiece> for PieceBoard {
     type Output = Bitboard;
 
@@ -111,11 +111,11 @@ impl PieceBoard {
         Bitboard::new(0b00001000_00000000_00000000_00000000_00000000_00000000_00000000_00000000), // ♔
     ]);
 
-    pub(crate) const fn piece_bitboard(&self, index: ChessPiece) -> Bitboard {
+    pub const fn piece_bitboard(&self, index: ChessPiece) -> Bitboard {
         self.0[((index.0 as usize) * 6) + (index.1 as usize)]
     }
 
-    pub(crate) const fn colour_bitboard(&self, side: Side) -> Bitboard {
+    pub(crate) const fn colour_blockers(&self, side: Side) -> Bitboard {
         match side {
             Side::White => self.white_blockers(),
             Side::Black => self.black_blockers(),
