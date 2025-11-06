@@ -382,6 +382,7 @@ impl SearchData {
                     if chessmove == chessmoves[i] {
                         chessmoves[i] = chessmoves[0];
                         chessmoves[0] = chessmove;
+                        break;
                     }
                     i += 1;
                 }
