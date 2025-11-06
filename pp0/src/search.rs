@@ -117,7 +117,7 @@ impl SearchData {
         self.pairs
     }
 
-    pub fn find_move(&mut self, chessgame: &mut ChessGame, ev: &mut impl Evaluator, tt: Arc<TT>, limit: &SearchLimit, moves: MoveList) -> ChessMove {
+    pub fn find_move(&mut self, chessgame: &mut ChessGame, ev: &mut impl Evaluator, tt: Arc<TT>, limit: &SearchLimit, moves: &MoveList) -> ChessMove {
         match limit {
             SearchLimit::Depth(depth) => self.search(chessgame, depth, ev, tt, moves),
             SearchLimit::Nodes(node_limit) => self.search_node_limited(chessgame, node_limit, ev, tt, moves),
@@ -125,7 +125,7 @@ impl SearchData {
         }
     }
 
-    fn search_node_limited(&mut self, chessgame: &mut ChessGame, node_limit: &NodeLimit, ev: &mut impl Evaluator, tt: Arc<TT>, moves: MoveList) -> ChessMove {
+    fn search_node_limited(&mut self, chessgame: &mut ChessGame, node_limit: &NodeLimit, ev: &mut impl Evaluator, tt: Arc<TT>, moves: &MoveList) -> ChessMove {
         assert!(!moves.is_empty());
         if moves.len() == 1 {
             if self.collect_pairs {
@@ -168,7 +168,7 @@ impl SearchData {
                 break 'search;
             }
 
-            for &chessmove in &moves {
+            for &chessmove in moves {
                 if chessmove == best_move {
                     continue;
                 }
@@ -210,7 +210,7 @@ impl SearchData {
         best_move
     }
 
-    fn search_time_limited(&mut self, chessgame: &mut ChessGame, time_limit: &TimeLimit, ev: &mut impl Evaluator, tt: Arc<TT>, moves: MoveList) -> ChessMove {
+    fn search_time_limited(&mut self, chessgame: &mut ChessGame, time_limit: &TimeLimit, ev: &mut impl Evaluator, tt: Arc<TT>, moves: &MoveList) -> ChessMove {
         assert!(!moves.is_empty());
         if moves.len() == 1 {
             if self.collect_pairs {
@@ -255,7 +255,7 @@ impl SearchData {
                 break 'search;
             }
 
-            for &chessmove in &moves {
+            for &chessmove in moves {
                 if chessmove == best_move {
                     continue;
                 }
@@ -299,7 +299,7 @@ impl SearchData {
         best_move
     }
 
-    fn search(&mut self, chessgame: &mut ChessGame, d: &NonZero<usize>, ev: &mut impl Evaluator, tt: Arc<TT>, moves: MoveList) -> ChessMove {
+    fn search(&mut self, chessgame: &mut ChessGame, d: &NonZero<usize>, ev: &mut impl Evaluator, tt: Arc<TT>, moves: &MoveList) -> ChessMove {
         assert!(!moves.is_empty());
         if moves.len() == 1 {
             if self.collect_pairs {
@@ -326,7 +326,7 @@ impl SearchData {
             ev.revert(&chessgame, &chessmove);
 
             if eval > best_eval {
-                best_move = chessmove;
+                best_move = *chessmove;
                 best_eval = eval;
             }
         }
@@ -345,7 +345,7 @@ impl SearchData {
         &mut self, chessgame: &mut ChessGame, a: i16, b: i16, d: usize, ev: &mut impl Evaluator, tt: Arc<TT>, time_limit: Option<(Instant, Duration)>,
         node_limit: Option<NonZero<usize>>,
     ) -> i16 {
-        let (chessmoves, gamestate) = chessgame.try_generate_moves();
+        let (mut chessmoves, gamestate) = chessgame.try_generate_moves();
 
         if let GameState::Finished(state) = gamestate {
             match state {
@@ -355,6 +355,10 @@ impl SearchData {
                 GameResult::Draw => return 0,
             }
         }
+
+        let mut alpha: i16 = a;
+        let mut best_score: i16 = i16::MIN + 1;
+        let mut best_move: Option<ChessMove> = None;
 
         if let Some(position_data) = tt.load(chessgame.hash(), Ordering::Relaxed) {
             if position_data.depth() as usize >= d {
@@ -371,6 +375,18 @@ impl SearchData {
                     _ => (),
                 }
             }
+
+            if let Some(chessmove) = position_data.best() {
+                let mut i: usize = 0;
+                while i < chessmoves.len() {
+                    if chessmove == chessmoves[i] {
+                        chessmoves[i] = chessmoves[0];
+                        chessmoves[0] = chessmove;
+                        break;
+                    }
+                    i += 1;
+                }
+            }
         }
 
         let d = match chessgame.is_in_check() {
@@ -381,9 +397,7 @@ impl SearchData {
         if d == 0 {
             return ev.eval(&chessgame);
         }
-        let mut alpha: i16 = a;
-        let mut best_score: i16 = i16::MIN + 1;
-        let mut best_move: Option<ChessMove> = None;
+
         //let mut best_move: Option<ChessMove> = None;
         for chessmove in chessmoves {
             //chef: only check every 1024 node
@@ -440,3 +454,4 @@ impl SearchData {
         best_score
     }
 }
+//

@@ -91,7 +91,7 @@ pub fn play<const COLLECT_PAIRS: bool>(player1: &mut Player, player2: &mut Playe
         let chess_move: ChessMove = match p1_white == (side == Side::White) {
             true => {
                 player1.evaluator.initialize(&chessgame);
-                let chess_move = search_data.find_move(&mut chessgame, &mut player1.evaluator, tt1.clone(), &player1.search_limit, moves);
+                let chess_move = search_data.find_move(&mut chessgame, &mut player1.evaluator, tt1.clone(), &player1.search_limit, &moves);
                 node_count_p1_total += search_data.node_count();
                 if COLLECT_PAIRS {
                     if let Some(pairs) = &mut pairs {
@@ -102,7 +102,7 @@ pub fn play<const COLLECT_PAIRS: bool>(player1: &mut Player, player2: &mut Playe
             }
             false => {
                 player2.evaluator.initialize(&chessgame);
-                let chess_move = search_data.find_move(&mut chessgame, &mut player2.evaluator, tt2.clone(), &player2.search_limit, moves);
+                let chess_move = search_data.find_move(&mut chessgame, &mut player2.evaluator, tt2.clone(), &player2.search_limit, &moves);
                 chess_move
             }
         };
