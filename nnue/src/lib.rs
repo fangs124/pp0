@@ -129,13 +129,16 @@ impl Network {
     //pub fn read(reader: &mut impl Read) -> Result<Network, Error> {
     //    //from viridithas
     //    let data = {
-    //        let mut net: Box<MaybeUninit<NetworkData>> = Box::new(MaybeUninit::uninit());
+    //        let mut net: MaybeUninit<Network>;
     //        let mem: &mut [u8] = unsafe { from_raw_parts_mut(net.as_mut_ptr().cast::<u8>(), DATA_LEN) };
     //        reader.read_exact(mem)?;
+    //        //let mut net: Box<MaybeUninit<NetworkData>> = Box::new(MaybeUninit::uninit());
+    //        //let mem: &mut [u8] = unsafe { from_raw_parts_mut(net.as_mut_ptr().cast::<u8>(), DATA_LEN) };
+    //        //reader.read_exact(mem)?;
     //        unsafe { net.assume_init() }
     //    };
     //
-    //    Ok(Network { data })
+    //    Ok(data)
     //}
 
     pub fn eval<const IS_STM_WHITE: bool>(&mut self) -> f32 {

@@ -1,14 +1,17 @@
 use core::time;
 use std::{
     num::NonZero,
-    sync::Arc,
+    sync::{Arc, atomic::Ordering},
     time::{Duration, Instant},
 };
 
 use chessbb::{ChessBoardSnapshot, ChessGame, ChessMove, GameResult, GameState, MoveList};
 use nnue::{SparseInputType, SparseVec};
 
-use crate::{evaluator::Evaluator, transposition::TranspositionTable};
+use crate::{
+    evaluator::Evaluator,
+    transposition::{NodeType, TranspositionTable},
+};
 
 pub const LOSE_SCORE: i16 = (i16::MIN + 2) / 2;
 pub const WIN_SCORE: i16 = -LOSE_SCORE;
@@ -146,9 +149,11 @@ impl SearchData {
             best_eval = i16::MIN + 1;
             //search previous best_move
             ev.update(&chessgame, &best_move);
+            self.ply += 1;
             let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&best_move);
             let eval: i16 = -self.negamax::<false, true>(chessgame, i16::MIN + 1, -best_eval, d, ev, tt.clone(), None, Some(node_limit.hard_limit));
             chessgame.restore_state(snapshot);
+            self.ply -= 1;
             ev.revert(&chessgame, &best_move);
             if self.is_aborted {
                 break 'search;
@@ -169,9 +174,11 @@ impl SearchData {
                 }
 
                 ev.update(&chessgame, &chessmove);
+                self.ply += 1;
                 let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&chessmove);
                 let eval: i16 = -self.negamax::<false, true>(chessgame, i16::MIN + 1, -best_eval, d, ev, tt.clone(), None, Some(node_limit.hard_limit));
                 chessgame.restore_state(snapshot);
+                self.ply -= 1;
                 ev.revert(&chessgame, &chessmove);
                 if self.is_aborted {
                     break 'search;
@@ -228,8 +235,10 @@ impl SearchData {
             best_eval = i16::MIN + 1;
             //search previous best_move
             ev.update(&chessgame, &best_move);
+            self.ply += 1;
             let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&best_move);
             let eval: i16 = -self.negamax::<true, false>(chessgame, i16::MIN + 1, -best_eval, d, ev, tt.clone(), Some((start, time_limit.hard_limit)), None);
+            self.ply -= 1;
             chessgame.restore_state(snapshot);
             ev.revert(&chessgame, &best_move);
 
@@ -252,10 +261,12 @@ impl SearchData {
                 }
 
                 ev.update(&chessgame, &chessmove);
+                self.ply += 1;
                 let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&chessmove);
                 let eval: i16 =
                     -self.negamax::<true, false>(chessgame, i16::MIN + 1, -best_eval, d, ev, tt.clone(), Some((start, time_limit.hard_limit)), None);
                 chessgame.restore_state(snapshot);
+                self.ply -= 1;
                 ev.revert(&chessgame, &chessmove);
 
                 if self.is_aborted {
@@ -296,7 +307,9 @@ impl SearchData {
                     chessbb::Side::White => (chessgame.to_sparse_vec_white(), chessgame.to_sparse_vec_black()),
                     chessbb::Side::Black => (chessgame.to_sparse_vec_black(), chessgame.to_sparse_vec_white()),
                 };
+                self.ply += 1;
                 self.pairs = Some((input, self.negamax::<false, false>(chessgame, i16::MIN + 1, i16::MAX - 1, d.get(), ev, tt.clone(), None, None)));
+                self.ply -= 1;
             }
             return moves[0];
         }
@@ -305,9 +318,11 @@ impl SearchData {
         let mut best_move: ChessMove = moves[0].clone();
         for chessmove in moves {
             ev.update(&chessgame, &chessmove);
+            self.ply += 1;
             let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&chessmove);
             let eval: i16 = -self.negamax::<false, false>(chessgame, i16::MIN + 1, -best_eval, d.get() - 1, ev, tt.clone(), None, None);
             chessgame.restore_state(snapshot);
+            self.ply -= 1;
             ev.revert(&chessgame, &chessmove);
 
             if eval > best_eval {
@@ -341,11 +356,29 @@ impl SearchData {
             }
         }
 
+        if let Some(position_data) = tt.load(chessgame.hash(), Ordering::Relaxed) {
+            if position_data.depth() as usize >= d {
+                match position_data.ty() {
+                    NodeType::Exact => {
+                        return position_data.eval();
+                    }
+                    NodeType::Alpha if position_data.eval() >= b => {
+                        return position_data.eval();
+                    }
+                    NodeType::Beta if position_data.eval() <= a => {
+                        return position_data.eval();
+                    }
+                    _ => (),
+                }
+            }
+        }
+
         if d == 0 {
             return ev.eval(&chessgame);
         }
         let mut alpha: i16 = a;
         let mut best_score: i16 = i16::MIN + 1;
+        let mut best_move: Option<ChessMove> = None;
         //let mut best_move: Option<ChessMove> = None;
         for chessmove in chessmoves {
             //chef: only check every 1024 node
@@ -383,6 +416,7 @@ impl SearchData {
 
             if score > best_score {
                 best_score = score;
+                best_move = Some(chessmove);
             }
 
             if score > alpha {
@@ -394,6 +428,10 @@ impl SearchData {
             }
         }
 
+        //tranposition table keep-up
+        if !self.is_aborted {
+            tt.update_tt(chessgame.hash(), best_score, best_move, a, b, d as u16, Ordering::Relaxed);
+        }
         best_score
     }
 }

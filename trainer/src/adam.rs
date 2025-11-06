@@ -29,8 +29,8 @@ pub fn sgd(net: &mut Network, results: Vec<MatchResult>) {
 }
 
 pub fn adam_single_threaded(net: &mut Network, results: Vec<MatchResult>, beta1: f32, beta2: f32, m: &mut Gradient, v: &mut Gradient) {
-    let mut m_grad = Gradient::zeros();
-    let mut v_grad = Gradient::zeros();
+    let mut m_grad = m.clone();
+    let mut v_grad = v.clone();
 
     let mut i: usize = 0;
     for result in results {
