@@ -211,7 +211,7 @@ impl Network {
     pub fn refresh_accumulator_sparse(&mut self, input: &impl SparseInputType) {
         let input_white = input.to_sparse_vec_white();
         let input_black = input.to_sparse_vec_black();
-        let w = self.input.w;
+        let w = &self.input.w;
 
         self.accumulator_w = input_white.into_iter().fold(self.input.b.clone(), |sum, i| sum + w.column(i));
         self.accumulator_b = input_black.into_iter().fold(self.input.b.clone(), |sum, i| sum + w.column(i));
