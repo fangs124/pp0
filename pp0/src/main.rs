@@ -6,7 +6,7 @@ use std::{
 
 use nnue::Network;
 use pp0::{uci_bench, uci_loop};
-const WEIGHT: &str = include_str!("../../net.nnue");
+const WEIGHT: &str = include_str!("../net.nnue");
 fn main() -> std::io::Result<()> {
     //let file = File::open("net.nnue")?;
     //let mut buf_reader = BufReader::new(file);

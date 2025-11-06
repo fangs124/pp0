@@ -2,5 +2,7 @@
 perf.data*
 *.epd
 *.log
-*.nnue
+prv.nnue
+enm.nnue
 *.json
+/backup
