@@ -248,11 +248,16 @@ impl ChessGame {
         let moves = self.chessboard.generate_moves();
         if moves.len() != 0 {
             return (moves, GameState::Ongoing);
-        } else if self.chessboard.is_king_in_check(side) {
+        } else if self.chessboard.is_in_check() {
             return (moves, GameState::Finished(GameResult::Win(side.update())));
         } else {
             return (moves, GameState::Finished(GameResult::Draw));
         }
+    }
+
+    #[inline(always)]
+    pub fn is_in_check(&self) -> bool {
+        self.chessboard.is_in_check()
     }
 
     pub fn from_fen(input: &str) -> ChessGame {
@@ -332,6 +337,10 @@ impl ChessBoard {
     pub(crate) const fn is_king_in_check(&self, king_side: Side) -> bool {
         let square = self.piece_bitboard(ChessPiece(king_side, PieceType::King)).lsb_square().expect("King not found!");
         self.is_square_attacked(square, king_side.update(), self.bitboards.blockers())
+    }
+
+    pub(crate) const fn is_in_check(&self) -> bool {
+        self.data.check_bb.is_not_zero()
     }
 
     #[inline(always)]

@@ -373,6 +373,11 @@ impl SearchData {
             }
         }
 
+        let d = match chessgame.is_in_check() {
+            true => d + 1,
+            false => d,
+        };
+
         if d == 0 {
             return ev.eval(&chessgame);
         }
