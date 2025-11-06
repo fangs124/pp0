@@ -51,12 +51,13 @@ enum LoopState {
     Review,
 }
 
-const LEARNING_RATE: f32 = 0.001; //0.001
+const LEARNING_RATE: f32 = 0.000001; //0.001
 const LAMBDA: f32 = 0.1;
 const BETA1: f32 = 0.9;
 const BETA2: f32 = 0.999;
 const MAX_DEPTH_LIMIT: usize = 3;
-const BATCH_SIZE: usize = 10000; //the games played is doubled this
+const ENM_START_DEPTH: usize = 2;
+const BATCH_SIZE: usize = 20000; //the games played is doubled this
 const PREVIOUS_FILENAME: &str = "prv.nnue";
 const NET_FILENAME: &str = "net.nnue";
 const ENM_FILENAME: &str = "enm.nnue";
@@ -140,7 +141,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
 
     let mut loop_state: LoopState = LoopState::Train;
     let mut player1: Player = Player { evaluator: PlayerEvaluator::Network(net.clone()), search_limit: SearchLimit::depth(3) };
-    let mut player2: Player = Player { evaluator: PlayerEvaluator::MaterialEvaluator(MATERIAL_EVAL.clone()), search_limit: SearchLimit::depth(1) };
+    let mut player2: Player = Player { evaluator: PlayerEvaluator::StaticEval(STATIC_EVAL.clone()), search_limit: SearchLimit::depth(ENM_START_DEPTH) };
     training_scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
 
     //debug zone
@@ -276,6 +277,12 @@ fn train(net: &mut Network) -> std::io::Result<()> {
 
         if scoreboard.finished_count >= 2 * batch_size {
             let mut stdout: RawTerminal<std::io::StdoutLock<'static>> = std::io::stdout().lock().into_raw_mode().unwrap();
+            let p2_ident = match &player2.evaluator {
+                PlayerEvaluator::Network(network) => &net_ident,
+                PlayerEvaluator::StaticEval(static_evaluator) => &static_eval_ident,
+                PlayerEvaluator::MaterialEvaluator(material_evaluator) => &mat_eval_ident,
+            };
+            scoreboard.update_ident(&player1, &net_ident, &player2, &p2_ident);
             scoreboard.epoch = Epoch(scoreboard.epoch.0 + 1);
             scoreboard.write(&mut stdout, (1, 2 + (6 * i)))?;
             scoreboard.write_to_buf(&mut log_file_buff)?;
@@ -320,9 +327,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                                 player2.evaluator = PlayerEvaluator::StaticEval(STATIC_EVAL);
                                 player2.search_limit = SearchLimit::depth(1);
                                 scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
-                            }
-
-                            if is_stronger_than_mat_eval && !is_stronger_than_hce_eval {
+                            } else if is_stronger_than_mat_eval && !is_stronger_than_hce_eval {
                                 is_stronger_than_hce_eval = true;
                                 player2.evaluator = player1.evaluator.clone();
                                 player2.search_limit = player1.search_limit.clone();
@@ -336,9 +341,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                         }
                         best_lose_rate = 1.0;
                         best_win_rate = 0.0;
-                    }
-
-                    if (is_stronger_than_mat_eval && is_stronger_than_mat_eval) && best_win_rate >= 0.65 {
+                    } else if (is_stronger_than_mat_eval && is_stronger_than_mat_eval) && best_win_rate >= 0.65 {
                         player2.evaluator = player1.evaluator.clone();
                         player2.search_limit = player1.search_limit.clone();
                         scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);

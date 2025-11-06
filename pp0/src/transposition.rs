@@ -227,6 +227,10 @@ impl AtomicTranspositionTable {
         }
         return total;
     }
+
+    pub const fn size_of() -> usize {
+        size_of::<AtomicPositionData>() * DEFAULT_SIZE
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, NoUninit)]
@@ -428,6 +432,10 @@ impl SmallAtomicTranspositionTable {
             }
         }
         return total;
+    }
+
+    pub const fn size_of() -> usize {
+        size_of::<SmallAtomicPositionData>() * DEFAULT_SIZE
     }
 }
 
