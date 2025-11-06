@@ -78,7 +78,7 @@ pub fn uci_bench(net: &mut Network) {
         let mut data = SearchData::new();
         let (chessmoves, _game_state) = chessgame.try_generate_moves();
         let now = Instant::now();
-        _ = data.find_move(&mut chessgame, net, tt, &SearchLimit::Depth(BENCH_DEPTH), chessmoves);
+        _ = data.find_move(&mut chessgame, net, tt, &SearchLimit::Depth(BENCH_DEPTH), &chessmoves);
         total_time += now.elapsed();
         total_nodes += data.node_count()
     }
