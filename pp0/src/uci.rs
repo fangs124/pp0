@@ -60,7 +60,7 @@ pub fn uci_loop(net: &mut Network) -> io::Result<()> {
     Ok(())
 }
 
-const DEFAULT_HASH_MB: usize = TT::size_of();
+const DEFAULT_HASH_MB: usize = TT::size_of() / 1024 / 1024;
 pub fn uci_option_info() {
     //
     println!("option name Threads type spin default 1 min 1 max 1");
