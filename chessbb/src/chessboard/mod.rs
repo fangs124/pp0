@@ -98,9 +98,7 @@ pub(crate) struct ChessData {
 }
 
 pub struct ChessBoardSnapshot {
-    bitboards: PieceBitboard,
-    mailbox: Mailbox,
-    data: ChessData,
+    chessboard: ChessBoard,
     hash: ZobristHash,
 }
 
@@ -268,18 +266,14 @@ impl ChessGame {
 
     #[inline(always)]
     pub fn explore_state(&mut self, chess_move: &ChessMove) -> ChessBoardSnapshot {
-        let bitboards = self.chessboard.bitboards.clone();
-        let mailbox = self.chessboard.mailbox.clone();
-        let data = self.chessboard.data.clone();
+        let chessboard = self.chessboard;
         self.update_state(chess_move);
-        ChessBoardSnapshot { bitboards, mailbox, data, hash: self.chessboard.hash() }
+        ChessBoardSnapshot { chessboard, hash: self.chessboard.hash() }
     }
 
     #[inline(always)]
     pub fn restore_state(&mut self, snapshot: ChessBoardSnapshot) {
-        self.chessboard.bitboards = snapshot.bitboards;
-        self.chessboard.mailbox = snapshot.mailbox;
-        self.chessboard.data = snapshot.data;
+        self.chessboard = snapshot.chessboard;
         self.zobrist_table.remove_last(snapshot.hash);
     }
 
