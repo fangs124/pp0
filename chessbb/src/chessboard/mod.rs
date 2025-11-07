@@ -10,6 +10,7 @@ use arrayvec::ArrayVec;
 use smallvec::SmallVec;
 
 use crate::MoveType;
+use crate::chessboard;
 #[cfg(not(feature = "piececolourboard"))]
 pub(crate) use crate::chessboard::pieceboard::PieceBoard;
 
@@ -238,6 +239,36 @@ impl ChessGame {
         self.zobrist_table.count_hash(self.hash())
     }
 
+    #[inline(always)]
+    pub fn is_fifty_move_rule(&self) -> bool {
+        self.chessboard.is_fifty_move_rule()
+    }
+
+    pub fn try_check_gamestate(&self) -> (Option<MoveList>, GameState) {
+        if self.repetition() >= 3 || self.is_fifty_move_rule() {
+            return (None, GameState::Finished(GameResult::Draw));
+        }
+
+        let target_mask = match self.is_in_check() {
+            true => self.chessboard.target_mask::<true>(),
+            false => self.chessboard.target_mask::<false>(),
+        };
+
+        if self.chessboard.is_king_move_available() || self.chessboard.is_knight_move_available(&target_mask) {
+            return (None, GameState::Ongoing);
+        }
+
+        let moves = self.chessboard.generate_rest_of_moves(&target_mask);
+        if moves.len() != 0 {
+            return (Some(moves), GameState::Ongoing);
+        } else if self.is_in_check() {
+            return (None, GameState::Finished(GameResult::Win(self.side().update())));
+        } else {
+            //stalemate
+            return (None, GameState::Finished(GameResult::Draw));
+        }
+    }
+
     pub fn try_generate_moves(&self) -> (MoveList, GameState) {
         if self.repetition() >= 3 || self.chessboard.is_fifty_move_rule() {
             return (MoveList::new(), GameState::Finished(GameResult::Draw));
@@ -251,6 +282,10 @@ impl ChessGame {
         } else {
             return (moves, GameState::Finished(GameResult::Draw));
         }
+    }
+
+    pub fn generate_moves(&self) -> MoveList {
+        self.chessboard.generate_moves()
     }
 
     #[inline(always)]

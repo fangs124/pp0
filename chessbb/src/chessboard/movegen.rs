@@ -53,8 +53,89 @@ impl ChessBoard {
         return moves;
     }
 
+    pub fn generate_rest_of_moves(&self, target_mask: &Bitboard) -> MoveList {
+        #[cfg(feature = "arrayvec")]
+        let mut moves: MoveList = ArrayVec::new();
+
+        #[cfg(feature = "smallvec")]
+        let mut moves: MoveList = SmallVec::with_capacity(64);
+
+        #[cfg(not(any(feature = "arrayvec", feature = "smallvec")))]
+        let mut moves: MoveList = Vec::with_capacity(40);
+
+        // consider if king is in check
+        let checkers_count: u32 = self.data.check_bb.count_ones();
+
+        match checkers_count {
+            0 => {
+                self.pawn_moves::<false>(&mut moves, &target_mask);
+                self.slider_moves::<false>(&mut moves, SliderType::Bishop, &target_mask);
+                self.slider_moves::<false>(&mut moves, SliderType::Rook, &target_mask);
+                self.slider_moves::<false>(&mut moves, SliderType::Queen, &target_mask);
+            }
+
+            1 => {
+                self.pawn_moves::<true>(&mut moves, &target_mask);
+                self.slider_moves::<true>(&mut moves, SliderType::Bishop, &target_mask);
+                self.slider_moves::<true>(&mut moves, SliderType::Rook, &target_mask);
+                self.slider_moves::<true>(&mut moves, SliderType::Queen, &target_mask);
+            }
+
+            _ => unreachable!(),
+        }
+
+        return moves;
+    }
+
+    pub(crate) fn is_knight_move_available(&self, target_squares: &Bitboard) -> bool {
+        debug_assert!(self.data.check_bb.count_ones() < 2);
+        if self.data.check_bb.count_ones() > 1 {
+            return false;
+        }
+        let side = self.side();
+        let pinned = self.data.pinned_bb;
+        let knights = self.bitboards.piece_bitboard(ChessPiece(side, PieceType::Knight));
+
+        for source in knights & !pinned {
+            let targets = get_knight_attack(source).bit_and(target_squares);
+            if targets.is_not_zero() {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub(crate) fn is_king_move_available(&self) -> bool {
+        let side = self.side();
+        let king_square = self.king_square(side);
+        let kingless_blockers = self.bitboards.blockers().bit_xor(&self.bitboards.piece_bitboard(ChessPiece(side, PieceType::King)));
+        #[cfg(feature = "kinglessattackmask")]
+        let mask = self.calculate_attacked_mask(kingless_blockers);
+
+        #[cfg(not(feature = "kinglessattackmask"))]
+        for target in get_king_attack(king_square) & !self.bitboards.colour_blockers(side) {
+            if !self.is_square_attacked(target, side.update(), kingless_blockers) {
+                moves.push(ChessMove::new(king_square, target, MoveType::Normal));
+            }
+        }
+
+        #[cfg(feature = "kinglessattackmask")]
+        if (get_king_attack(king_square) & !self.bitboards.colour_blockers(side) & !mask).is_not_zero() {
+            return true;
+        }
+
+        if !self.is_in_check() {
+            if self.is_castling_legal(Castling::Kingside(side)) || self.is_castling_legal(Castling::Queenside(side)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     //from cozy-chess
-    const fn target_mask<const IS_IN_CHECK: bool>(&self) -> Bitboard {
+    pub(crate) const fn target_mask<const IS_IN_CHECK: bool>(&self) -> Bitboard {
         debug_assert!(self.data.check_bb.count_ones() < 2);
         let side = self.side();
         let targets = match IS_IN_CHECK {
