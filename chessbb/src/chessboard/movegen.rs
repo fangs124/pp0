@@ -53,6 +53,46 @@ impl ChessBoard {
         return moves;
     }
 
+    pub fn generate_captures(&self) -> MoveList {
+        #[cfg(feature = "arrayvec")]
+        let mut moves: MoveList = ArrayVec::new();
+
+        #[cfg(feature = "smallvec")]
+        let mut moves: MoveList = SmallVec::with_capacity(64);
+
+        #[cfg(not(any(feature = "arrayvec", feature = "smallvec")))]
+        let mut moves: MoveList = Vec::with_capacity(40);
+
+        // consider if king is in check
+        let checkers_count: u32 = self.data.check_bb.count_ones();
+
+        match checkers_count {
+            0 => {
+                let target_mask = self.capture_mask::<false>();
+                self.pawn_moves::<false>(&mut moves, &target_mask);
+                self.knight_moves(&mut moves, &target_mask);
+                self.slider_moves::<false>(&mut moves, SliderType::Bishop, &target_mask);
+                self.slider_moves::<false>(&mut moves, SliderType::Rook, &target_mask);
+                self.slider_moves::<false>(&mut moves, SliderType::Queen, &target_mask);
+                self.king_moves::<false>(&mut moves)
+            }
+
+            1 => {
+                let target_mask = self.capture_mask::<true>();
+                self.pawn_moves::<true>(&mut moves, &target_mask);
+                self.knight_moves(&mut moves, &target_mask);
+                self.slider_moves::<true>(&mut moves, SliderType::Bishop, &target_mask);
+                self.slider_moves::<true>(&mut moves, SliderType::Rook, &target_mask);
+                self.slider_moves::<true>(&mut moves, SliderType::Queen, &target_mask);
+                self.king_moves::<true>(&mut moves)
+            }
+
+            _ => self.king_moves::<true>(&mut moves),
+        }
+
+        return moves;
+    }
+
     pub fn generate_rest_of_moves(&self, target_mask: &Bitboard) -> MoveList {
         #[cfg(feature = "arrayvec")]
         let mut moves: MoveList = ArrayVec::new();
@@ -144,6 +184,17 @@ impl ChessBoard {
         };
 
         return targets.bit_and(&self.bitboards.colour_blockers(side).bit_not());
+    }
+
+    pub(crate) const fn capture_mask<const IS_IN_CHECK: bool>(&self) -> Bitboard {
+        debug_assert!(self.data.check_bb.count_ones() < 2);
+        let side = self.side();
+        let targets = match IS_IN_CHECK {
+            true => self.data.check_mask,
+            false => self.bitboards.colour_blockers(side.update()),
+        };
+
+        return targets;
     }
 
     fn pawn_moves<const IS_IN_CHECK: bool>(&self, moves: &mut MoveList, target_squares: &Bitboard) {

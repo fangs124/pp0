@@ -283,9 +283,14 @@ impl ChessGame {
             return (moves, GameState::Finished(GameResult::Draw));
         }
     }
-
+    #[inline(always)]
     pub fn generate_moves(&self) -> MoveList {
         self.chessboard.generate_moves()
+    }
+
+    #[inline(always)]
+    pub fn generate_captures(&self) -> MoveList {
+        self.chessboard.generate_captures()
     }
 
     #[inline(always)]

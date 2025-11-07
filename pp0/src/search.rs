@@ -91,7 +91,7 @@ pub struct SearchData {
 type TT = TranspositionTable;
 
 const NODE_COUNT_CHECK_LIMIT: usize = 1024;
-
+const DEFAULT_QSEARCH_MAX_DEPTH: usize = 3;
 impl SearchData {
     pub const fn new() -> SearchData {
         SearchData { ply: 0, max_depth: 0, node_count: 0, collect_pairs: false, pairs: None, is_aborted: false }
@@ -361,7 +361,7 @@ impl SearchData {
         };
 
         if d == 0 {
-            return ev.eval(&chessgame);
+            return self.qsearch::<IS_TIME_LIMITED, IS_NODE_LIMITED>(chessgame, a, b, DEFAULT_QSEARCH_MAX_DEPTH, ev, tt.clone(), time_limit, node_limit);
         }
 
         let mut chessmoves = chessmoves.unwrap_or_else(|| chessgame.generate_moves());
@@ -451,6 +451,95 @@ impl SearchData {
         if !self.is_aborted {
             tt.update_tt(chessgame.hash(), best_score, best_move, a, b, d as u16, Ordering::Relaxed);
         }
+        best_score
+    }
+
+    pub fn qsearch<const IS_TIME_LIMITED: bool, const IS_NODE_LIMITED: bool>(
+        &mut self, chessgame: &mut ChessGame, a: i16, b: i16, d: usize, ev: &mut impl Evaluator, tt: Arc<TT>, time_limit: Option<(Instant, Duration)>,
+        node_limit: Option<NonZero<usize>>,
+    ) -> i16 {
+        if chessgame.repetition() >= 3 || chessgame.is_fifty_move_rule() {
+            return 0;
+        }
+
+        let mut best_score: i16 = ev.eval(chessgame);
+        let mut alpha = a;
+
+        //assuming non-zugzwang?
+        if best_score >= b || d == 0 || self.ply >= u8::MAX as u16 {
+            return best_score;
+        }
+
+        if best_score > alpha {
+            alpha = best_score;
+        }
+        //let mut best_move: Option<ChessMove> = None;
+
+        let chessmoves = match chessgame.is_in_check() {
+            true => {
+                let (moves, game_state) = chessgame.try_generate_moves();
+                if let GameState::Finished(state) = game_state {
+                    match state {
+                        GameResult::Win(_) => {
+                            return LOSE_SCORE + (self.ply as i16); //TODO determine if +d or -d or something else should be used here.
+                        }
+                        GameResult::Draw => return 0,
+                    }
+                }
+                moves
+            }
+            false => chessgame.generate_captures(),
+        };
+
+        //let mut best_move: Option<ChessMove> = None;
+        for chessmove in chessmoves {
+            //chef: only check every 1024 node
+            if IS_NODE_LIMITED {
+                let node_limit = unsafe { node_limit.unwrap_unchecked() };
+                if node_limit.get() > self.node_count {
+                    self.is_aborted = true;
+                    return match best_score >= b {
+                        true => best_score,
+                        false => i16::MIN + 1,
+                    };
+                }
+            }
+
+            if IS_TIME_LIMITED && self.node_count % NODE_COUNT_CHECK_LIMIT == 0 {
+                let time_limit = unsafe { time_limit.unwrap_unchecked() };
+                if time_limit.0.elapsed() >= time_limit.1 {
+                    self.is_aborted = true;
+                    return match best_score >= b {
+                        true => best_score,
+                        false => i16::MIN + 1,
+                    };
+                }
+            }
+
+            self.node_count += 1; //apparently this is the accepted way to count nps
+
+            ev.update(&chessgame, &chessmove);
+            let snapshot: ChessBoardSnapshot = chessgame.explore_state(&chessmove);
+            self.ply += 1;
+            let score: i16 = -self.qsearch::<IS_TIME_LIMITED, IS_NODE_LIMITED>(chessgame, -b, -alpha, d - 1, ev, tt.clone(), time_limit, node_limit);
+            self.ply -= 1;
+            chessgame.restore_state(snapshot);
+            ev.revert(&chessgame, &chessmove);
+
+            if score > best_score {
+                best_score = score;
+                //best_move = Some(chessmove);
+            }
+
+            if score > alpha {
+                alpha = score;
+            }
+
+            if alpha >= b {
+                break;
+            }
+        }
+
         best_score
     }
 }
