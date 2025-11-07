@@ -298,6 +298,18 @@ impl ChessGame {
         self.chessboard.is_in_check()
     }
 
+    #[inline(always)]
+    pub fn sort_moves(&self, chessmoves: &mut MoveList) {
+        chessmoves.sort_unstable_by_key(|chessmove| self.mvv_lva_score(chessmove));
+    }
+
+    #[inline(always)]
+    pub fn mvv_lva_score(&self, chessmove: &ChessMove) -> i16 {
+        let source_score: i16 = self.chessboard.square_index(chessmove.source()).unwrap().1 as i16;
+        let target_score: i16 = self.chessboard.square_index(chessmove.target()).map_or(0, |x| x.1 as i16);
+        return (100 * target_score) - source_score + 105;
+    }
+
     pub fn from_fen(input: &str) -> ChessGame {
         let chessboard: ChessBoard = ChessBoard::from_fen(input);
         let zobrist_table: ZobristTable = ZobristTable::new(chessboard.hash());
