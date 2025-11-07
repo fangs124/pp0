@@ -300,7 +300,7 @@ impl ChessGame {
 
     #[inline(always)]
     pub fn sort_moves(&self, chessmoves: &mut MoveList) {
-        chessmoves.sort_unstable_by_key(|chessmove| self.mvv_lva_score(chessmove));
+        chessmoves.sort_unstable_by_key(|chessmove| -self.mvv_lva_score(chessmove)); //rust's sort is ascending
     }
 
     #[inline(always)]
