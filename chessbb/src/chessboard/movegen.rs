@@ -81,7 +81,7 @@ impl ChessBoard {
                 self.slider_moves::<true>(&mut moves, SliderType::Queen, &target_mask);
             }
 
-            _ => unreachable!(),
+            _ => (),
         }
 
         return moves;
