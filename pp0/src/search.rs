@@ -345,8 +345,7 @@ impl SearchData {
         &mut self, chessgame: &mut ChessGame, a: i16, b: i16, d: usize, ev: &mut impl Evaluator, tt: Arc<TT>, time_limit: Option<(Instant, Duration)>,
         node_limit: Option<NonZero<usize>>,
     ) -> i16 {
-        let (mut chessmoves, gamestate) = chessgame.try_generate_moves();
-
+        let (chessmoves, gamestate) = chessgame.try_check_gamestate();
         if let GameState::Finished(state) = gamestate {
             match state {
                 GameResult::Win(_) => {
@@ -356,6 +355,16 @@ impl SearchData {
             }
         }
 
+        let d = match chessgame.is_in_check() {
+            true => d + 1,
+            false => d,
+        };
+
+        if d == 0 {
+            return ev.eval(&chessgame);
+        }
+
+        let mut chessmoves = chessmoves.unwrap_or_else(|| chessgame.generate_moves());
         let mut alpha: i16 = a;
         let mut best_score: i16 = i16::MIN + 1;
         let mut best_move: Option<ChessMove> = None;
@@ -387,15 +396,6 @@ impl SearchData {
                     i += 1;
                 }
             }
-        }
-
-        let d = match chessgame.is_in_check() {
-            true => d + 1,
-            false => d,
-        };
-
-        if d == 0 {
-            return ev.eval(&chessgame);
         }
 
         //let mut best_move: Option<ChessMove> = None;
