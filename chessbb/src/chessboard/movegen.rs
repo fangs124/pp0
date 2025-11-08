@@ -50,7 +50,7 @@ impl ChessBoard {
             _ => self.king_moves::<true>(&mut moves),
         }
 
-        self.sort_moves(&mut moves); //naive implementation, insertion sort is probably better
+        self.sort_moves(&mut moves); //naive implementation, selection sort is probably better
         return moves;
     }
 
