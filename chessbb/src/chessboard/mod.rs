@@ -300,14 +300,12 @@ impl ChessGame {
 
     #[inline(always)]
     pub fn sort_moves(&self, chessmoves: &mut MoveList) {
-        chessmoves.sort_unstable_by_key(|chessmove| -self.mvv_lva_score(chessmove)); //rust's sort is ascending
+        self.chessboard.sort_moves(chessmoves);
     }
 
     #[inline(always)]
     pub fn mvv_lva_score(&self, chessmove: &ChessMove) -> i16 {
-        let source_score: i16 = self.chessboard.square_index(chessmove.source()).unwrap().1 as i16;
-        let target_score: i16 = self.chessboard.square_index(chessmove.target()).map_or(0, |x| x.1 as i16);
-        return (100 * target_score) - source_score + 105;
+        self.chessboard.mvv_lva_score(chessmove)
     }
 
     pub fn from_fen(input: &str) -> ChessGame {
@@ -385,8 +383,21 @@ impl ChessBoard {
         self.is_square_attacked(square, king_side.update(), self.bitboards.blockers())
     }
 
+    #[inline(always)]
     pub(crate) const fn is_in_check(&self) -> bool {
         self.data.check_bb.is_not_zero()
+    }
+
+    #[inline(always)]
+    pub fn sort_moves(&self, chessmoves: &mut MoveList) {
+        chessmoves.sort_by_cached_key(|chessmove| -self.mvv_lva_score(chessmove)); //rust's sort is ascending
+    }
+
+    #[inline(always)]
+    pub fn mvv_lva_score(&self, chessmove: &ChessMove) -> i16 {
+        let source_score: i16 = self.square_index(chessmove.source()).unwrap().1 as i16;
+        let target_score: i16 = self.square_index(chessmove.target()).map_or(0, |x| x.1 as i16);
+        return (100 * target_score) - source_score + 105;
     }
 
     #[inline(always)]
