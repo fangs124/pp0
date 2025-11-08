@@ -475,7 +475,7 @@ impl SearchData {
         }
         //let mut best_move: Option<ChessMove> = None;
 
-        let chessmoves = match chessgame.is_in_check() {
+        let mut chessmoves = match chessgame.is_in_check() {
             true => {
                 let (moves, game_state) = chessgame.try_generate_moves();
                 if let GameState::Finished(state) = game_state {
@@ -491,6 +491,7 @@ impl SearchData {
             false => chessgame.generate_captures(),
         };
 
+        chessgame.sort_moves(&mut chessmoves);
         //let mut best_move: Option<ChessMove> = None;
         for chessmove in chessmoves {
             //chef: only check every 1024 node
