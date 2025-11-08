@@ -390,7 +390,7 @@ impl ChessBoard {
 
     #[inline(always)]
     pub fn sort_moves(&self, chessmoves: &mut MoveList) {
-        chessmoves.sort_unstable_by_key(|chessmove| -self.mvv_lva_score(chessmove)); //rust's sort is ascending
+        chessmoves.sort_by_cached_key(|chessmove| -self.mvv_lva_score(chessmove)); //rust's sort is ascending
     }
 
     #[inline(always)]
