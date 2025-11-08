@@ -51,12 +51,12 @@ enum LoopState {
     Review,
 }
 
-const LEARNING_RATE: f32 = 0.000001; //0.001
+const LEARNING_RATE: f32 = 0.001; //0.001
 const LAMBDA: f32 = 0.1;
 const BETA1: f32 = 0.9;
 const BETA2: f32 = 0.999;
 const MAX_DEPTH_LIMIT: usize = 4;
-const ENM_START_DEPTH: usize = 3;
+const ENM_START_DEPTH: usize = 2;
 const BATCH_SIZE: usize = 20000; //the games played is doubled this
 const PREVIOUS_FILENAME: &str = "prv.nnue";
 const NET_FILENAME: &str = "net.nnue";
@@ -199,7 +199,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
             write!(stdout, "{}{}", cursor::Goto(1, 1), clear::CurrentLine)?;
             write!(
                 stdout,
-                "{}Press q to stop. ({} finished: {}/{}, elapsed {}s, eta {}h {}m {:.2}s) instance_count: {} rayon: {}{}\n\r",
+                "{}Press q to stop. ({} finished: {}/{}, elapsed {}s, eta {}h {}m {:.2}s) W/D/L: {}/{}/{}{}\n\r",
                 cursor::Goto(1, 1),
                 loop_ident,
                 scoreboard.finished_count / 2,
@@ -208,8 +208,9 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                 eta_h as isize,
                 eta_m as isize,
                 eta_s,
-                INSTANCE_COUNT.load(Ordering::Relaxed),
-                rayon::current_num_threads(),
+                scoreboard.wins,
+                scoreboard.draws,
+                scoreboard.losses,
                 cursor::Goto(1, 14)
             )?;
             drop(stdout);
