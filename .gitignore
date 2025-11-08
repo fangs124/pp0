@@ -6,3 +6,4 @@ prv.nnue
 enm.nnue
 *.json
 /backup
+*.backup

@@ -51,12 +51,12 @@ enum LoopState {
     Review,
 }
 
-const LEARNING_RATE: f32 = 0.001; //0.001
+const LEARNING_RATE: f32 = 0.00001; //0.001
 const LAMBDA: f32 = 0.1;
 const BETA1: f32 = 0.9;
 const BETA2: f32 = 0.999;
 const MAX_DEPTH_LIMIT: usize = 4;
-const ENM_START_DEPTH: usize = 2;
+const ENM_START_DEPTH: usize = 3;
 const BATCH_SIZE: usize = 20000; //the games played is doubled this
 const PREVIOUS_FILENAME: &str = "prv.nnue";
 const NET_FILENAME: &str = "net.nnue";
