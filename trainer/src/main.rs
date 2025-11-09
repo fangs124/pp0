@@ -174,6 +174,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
     let mut is_stronger_than_mat_eval: bool = START_STRONGER_THAN_MAT;
     let mut is_stronger_than_hce_eval: bool = START_STRONGER_THAN_HCE;
     let mut loop_counter: usize = 0;
+    let mut best_win_score: f32 = 0.0;
     let mut best_win_rate: f32 = 0.0;
     let mut best_lose_rate: f32 = 100.0;
     let mut stdout: RawTerminal<std::io::StdoutLock<'static>> = std::io::stdout().lock().into_raw_mode().unwrap();
@@ -316,8 +317,14 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                         batch_size = BATCH_SIZE / REVIEW_COEFFICIENT;
                         loop_state = LoopState::Review;
                     } else if NO_REVIEW {
+                        let new_win_score: f32 = (scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0) / (scoreboard.finished_count as f32);
+                        let new_win_rate: f32 = (scoreboard.wins as f32) / (scoreboard.finished_count as f32);
+                        let new_lose_rate: f32 = (scoreboard.losses as f32) / (scoreboard.finished_count as f32);
+                        best_win_score = best_win_score.max(new_win_score);
+                        best_win_rate = best_win_rate.max(new_win_rate);
+                        best_lose_rate = best_lose_rate.min(new_lose_rate);
                         //the MAT_EVAL and HCE_EVAL case
-                        if (!is_stronger_than_mat_eval || !is_stronger_than_mat_eval) && best_win_rate >= 0.65 {
+                        if (!is_stronger_than_mat_eval || !is_stronger_than_mat_eval) && best_win_score >= 0.65 {
                             if !START_STRONGER_THAN_HCE || !START_STRONGER_THAN_MAT {
                                 if let SearchLimit::Depth(d) = player2.search_limit
                                     && d.get() < MAX_DEPTH_LIMIT
@@ -344,13 +351,15 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                                 }
                                 best_lose_rate = 1.0;
                                 best_win_rate = 0.0;
+                                best_win_score = 0.0
                             }
-                        } else if (is_stronger_than_mat_eval && is_stronger_than_mat_eval) && best_win_rate >= 0.65 {
+                        } else if (is_stronger_than_mat_eval && is_stronger_than_mat_eval) && best_win_score >= 0.65 {
                             player2.evaluator = player1.evaluator.clone();
                             player2.search_limit = player1.search_limit.clone();
                             scoreboard.update_ident(&player1, &net_ident, &player2, &net_ident);
                             best_lose_rate = 1.0;
                             best_win_rate = 0.0;
+                            best_win_score = 0.0;
 
                             if let PlayerEvaluator::Network(ref enm) = player2.evaluator {
                                 let mut file = File::create(ENM_FILENAME)?;
@@ -362,17 +371,19 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                 }
 
                 LoopState::Review => {
+                    let new_win_score: f32 = (scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0) / (scoreboard.finished_count as f32);
                     let new_win_rate: f32 = (scoreboard.wins as f32) / (scoreboard.finished_count as f32);
                     let new_lose_rate: f32 = (scoreboard.losses as f32) / (scoreboard.finished_count as f32);
+                    best_win_score = best_win_score.max(new_win_score);
                     best_win_rate = best_win_rate.max(new_win_rate);
                     best_lose_rate = best_lose_rate.min(new_lose_rate);
                     write!(stdout, "{}{}", cursor::Goto(1, 20), clear::CurrentLine)?;
                     write!(stdout, "{}{}", cursor::Goto(1, 21), clear::CurrentLine)?;
                     write!(stdout, "{}", cursor::Goto(1, 20))?;
                     write!(stdout, "lose rate: {:.2}% (best: {:.2}%)", new_lose_rate * 100.0, best_lose_rate * 100.0,)?;
-                    write!(stdout, ", best win rate: {:.2}%\n\r", best_win_rate * 100.0)?;
+                    write!(stdout, ", best win score: {:.2}%\n\r", best_win_score * 100.0)?;
                     //the MAT_EVAL and HCE_EVAL case
-                    if (!is_stronger_than_mat_eval || !is_stronger_than_mat_eval) && best_win_rate >= 0.65 {
+                    if (!is_stronger_than_mat_eval || !is_stronger_than_mat_eval) && best_win_score >= 0.65 {
                         if !START_STRONGER_THAN_HCE || !START_STRONGER_THAN_MAT {
                             if let SearchLimit::Depth(d) = player2.search_limit
                                 && d.get() < MAX_DEPTH_LIMIT
@@ -400,12 +411,13 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                             best_lose_rate = 1.0;
                             best_win_rate = 0.0;
                         }
-                    } else if (is_stronger_than_mat_eval && is_stronger_than_mat_eval) && best_win_rate >= 0.65 {
+                    } else if (is_stronger_than_mat_eval && is_stronger_than_mat_eval) && best_win_score >= 0.65 {
                         player2.evaluator = player1.evaluator.clone();
                         player2.search_limit = player1.search_limit.clone();
                         scoreboard.update_ident(&player1, &net_ident, &player2, &net_ident);
                         best_lose_rate = 1.0;
                         best_win_rate = 0.0;
+                        best_win_score = 0.0;
 
                         if let PlayerEvaluator::Network(ref enm) = player2.evaluator {
                             let mut file = File::create(ENM_FILENAME)?;
