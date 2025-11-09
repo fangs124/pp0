@@ -50,14 +50,17 @@ enum LoopState {
     Train,
     Review,
 }
-
+const START_STRONGER_THAN_HCE: bool = true;
+const START_STRONGER_THAN_MAT: bool = true;
 const LEARNING_RATE: f32 = 0.000001; //0.001
 const LAMBDA: f32 = 0.1;
 const BETA1: f32 = 0.9;
 const BETA2: f32 = 0.999;
+const NET_DEPTH: usize = 4;
 const MAX_DEPTH_LIMIT: usize = 4;
-const ENM_START_DEPTH: usize = 3;
-const BATCH_SIZE: usize = 20000; //the games played is doubled this
+const ENM_START_DEPTH: usize = 4;
+const BATCH_SIZE: usize = 2000; //the games played is doubled this
+const REVIEW_COEFFICIENT: usize = 2; //this is the n in: review =  (1/n) * batch_size
 const PREVIOUS_FILENAME: &str = "prv.nnue";
 const NET_FILENAME: &str = "net.nnue";
 const ENM_FILENAME: &str = "enm.nnue";
@@ -140,8 +143,9 @@ fn train(net: &mut Network) -> std::io::Result<()> {
     let mut results: Vec<MatchResult> = Vec::new();
 
     let mut loop_state: LoopState = LoopState::Train;
-    let mut player1: Player = Player { evaluator: PlayerEvaluator::Network(net.clone()), search_limit: SearchLimit::depth(3) };
-    let mut player2: Player = Player { evaluator: PlayerEvaluator::StaticEval(STATIC_EVAL.clone()), search_limit: SearchLimit::depth(ENM_START_DEPTH) };
+    let mut player1: Player = Player { evaluator: PlayerEvaluator::Network(net.clone()), search_limit: SearchLimit::depth(NET_DEPTH) };
+    let mut player2: Player = Player { evaluator: PlayerEvaluator::Network(net.clone()), search_limit: SearchLimit::depth(NET_DEPTH) };
+    //let mut player2: Player = Player { evaluator: PlayerEvaluator::StaticEval(STATIC_EVAL.clone()), search_limit: SearchLimit::depth(ENM_START_DEPTH) };
     training_scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
 
     //debug zone
@@ -160,8 +164,8 @@ fn train(net: &mut Network) -> std::io::Result<()> {
     //};
 
     let mut now = Instant::now();
-    let mut is_stronger_than_mat_eval: bool = false;
-    let mut is_stronger_than_hce_eval: bool = false;
+    let mut is_stronger_than_mat_eval: bool = START_STRONGER_THAN_MAT;
+    let mut is_stronger_than_hce_eval: bool = START_STRONGER_THAN_HCE;
     let mut loop_counter: usize = 0;
     let mut best_win_rate: f32 = 0.0;
     let mut best_lose_rate: f32 = 100.0;
@@ -300,7 +304,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                     //adam(net, results, BETA1, BETA2, &mut m, &mut v)?;
                     //update net, gradient stuff here
                     player1.evaluator = PlayerEvaluator::Network(net.clone());
-                    batch_size = BATCH_SIZE / 5;
+                    batch_size = BATCH_SIZE / REVIEW_COEFFICIENT;
                     results = Vec::new();
                     loop_state = LoopState::Review;
                 }
@@ -345,7 +349,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                     } else if (is_stronger_than_mat_eval && is_stronger_than_mat_eval) && best_win_rate >= 0.65 {
                         player2.evaluator = player1.evaluator.clone();
                         player2.search_limit = player1.search_limit.clone();
-                        scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
+                        scoreboard.update_ident(&player1, &net_ident, &player2, &net_ident);
                         best_lose_rate = 1.0;
                         best_win_rate = 0.0;
 

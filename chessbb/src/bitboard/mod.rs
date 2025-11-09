@@ -62,6 +62,8 @@ impl Bitboard {
     pub const ZERO: Bitboard = Bitboard(0u64);
     pub const ONES: Bitboard = Bitboard(u64::MAX);
 
+    pub const WHITE: Bitboard = Bitboard(0x55AA55AA55AA55AA);
+    pub const BLACK: Bitboard = Bitboard(0xAA55AA55AA55AA55);
     pub(crate) const NOT_A_FILE: Bitboard = Bitboard(0b01111111_01111111_01111111_01111111_01111111_01111111_01111111_01111111);
     pub(crate) const NOT_H_FILE: Bitboard = Bitboard(0b11111110_11111110_11111110_11111110_11111110_11111110_11111110_11111110);
     pub(crate) const NOT_PROMOTION_SQUARES: Bitboard = Bitboard(0b00000000_11111111_11111111_11111111_11111111_11111111_11111111_00000000);

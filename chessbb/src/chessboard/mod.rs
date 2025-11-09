@@ -245,7 +245,7 @@ impl ChessGame {
     }
 
     pub fn try_check_gamestate(&self) -> (Option<MoveList>, GameState) {
-        if self.repetition() >= 3 || self.is_fifty_move_rule() {
+        if self.repetition() >= 3 || self.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
             return (None, GameState::Finished(GameResult::Draw));
         }
 
@@ -270,7 +270,7 @@ impl ChessGame {
     }
 
     pub fn try_generate_moves(&self) -> (MoveList, GameState) {
-        if self.repetition() >= 3 || self.chessboard.is_fifty_move_rule() {
+        if self.repetition() >= 3 || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
             return (MoveList::new(), GameState::Finished(GameResult::Draw));
         }
         let side = self.side();
@@ -283,6 +283,7 @@ impl ChessGame {
             return (moves, GameState::Finished(GameResult::Draw));
         }
     }
+
     #[inline(always)]
     pub fn generate_moves(&self) -> MoveList {
         self.chessboard.generate_moves()
@@ -512,6 +513,23 @@ impl ChessBoard {
                     || (get_king_attack(square).bit_and(&self.piece_bitboard(ChessPiece::BK))).is_not_zero()
             }
         }
+    }
+
+    pub const fn is_insufficient_material(&self) -> bool {
+        if self.bitboards.piece(PieceType::Pawn).bit_or(&self.bitboards.piece(PieceType::Rook)).bit_or(&self.bitboards.piece(PieceType::Queen)).is_zero() {
+            //only knights, and bishops here. yoinked from akimbo
+            if self.bitboards.blockers().count_ones() <= 3 {
+                return true;
+            }
+
+            if self.bitboards.piece(PieceType::Knight).is_not_zero() {
+                return false;
+            }
+
+            let bishops = self.bitboards.piece(PieceType::Bishop);
+            return matches!(bishops.bit_and(&Bitboard::WHITE), bishops) || matches!(bishops.bit_and(&Bitboard::BLACK), bishops);
+        }
+        return false;
     }
 }
 

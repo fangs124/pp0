@@ -162,7 +162,7 @@ impl ChessBoard {
         }
 
         #[cfg(feature = "kinglessattackmask")]
-        if (get_king_attack(king_square) & !self.bitboards.colour_blockers(side) & !mask).is_not_zero() {
+        if (get_king_attack(king_square) & !self.bitboards.side(side) & !mask).is_not_zero() {
             return true;
         }
 
@@ -184,7 +184,7 @@ impl ChessBoard {
             false => Bitboard::ONES,
         };
 
-        return targets.bit_and(&self.bitboards.colour_blockers(side).bit_not());
+        return targets.bit_and(&self.bitboards.side(side).bit_not());
     }
 
     pub(crate) const fn capture_mask<const IS_IN_CHECK: bool>(&self) -> Bitboard {
@@ -192,7 +192,7 @@ impl ChessBoard {
         let side = self.side();
         let targets = match IS_IN_CHECK {
             true => self.data.check_mask,
-            false => self.bitboards.colour_blockers(side.update()),
+            false => self.bitboards.side(side.update()),
         };
 
         return targets;
@@ -206,7 +206,7 @@ impl ChessBoard {
         let pawns = self.bitboards.piece_bitboard(ChessPiece(side, PieceType::Pawn));
         let pinned = self.data.pinned_bb;
         let blockers = self.bitboards.blockers();
-        let enemies = self.bitboards.colour_blockers(enemy_side);
+        let enemies = self.bitboards.side(enemy_side);
         let king_square = self.king_square(side);
         for source in pawns & !pinned {
             let targets = (get_pawn_quiet(side, source, &blockers) | (get_pawn_attack(side, source) & enemies)) & *target_squares;
@@ -319,7 +319,7 @@ impl ChessBoard {
         }
 
         #[cfg(feature = "kinglessattackmask")]
-        ChessMove::add_normal_moves(king_square, get_king_attack(king_square) & !self.bitboards.colour_blockers(side) & !mask, moves);
+        ChessMove::add_normal_moves(king_square, get_king_attack(king_square) & !self.bitboards.side(side) & !mask, moves);
 
         if !IS_IN_CHECK {
             if self.is_castling_legal(Castling::Kingside(side)) {
@@ -362,7 +362,7 @@ impl ChessBoard {
 
     const fn calculate_attacking_pawns(&self) -> Bitboard {
         let side = self.data.side_to_move;
-        let targets = self.bitboards.colour_blockers(side.update()).bit_or(&self.data.enpassant_bb);
+        let targets = self.bitboards.side(side.update()).bit_or(&self.data.enpassant_bb);
 
         return match side {
             Side::White => (targets.shr(9).bit_and(&Bitboard::NOT_A_FILE)).bit_or(&targets.shr(7).bit_and(&Bitboard::NOT_H_FILE)),

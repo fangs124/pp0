@@ -1,7 +1,7 @@
 use std::{fmt::Debug, ops::Index};
 
 use crate::{
-    Bitboard, ChessPiece, Side,
+    Bitboard, ChessPiece, PieceType, Side,
     chessboard::{COLOUR_LABELS, PIECE_LABELS},
     square::Square,
 };
@@ -62,8 +62,12 @@ impl PieceColourBoard {
         self.colour[1]
     }
 
-    pub(crate) const fn colour_blockers(&self, side: Side) -> Bitboard {
+    pub(crate) const fn side(&self, side: Side) -> Bitboard {
         self.colour[side as usize]
+    }
+
+    pub(crate) const fn piece(&self, piece: PieceType) -> Bitboard {
+        self.piece[piece as usize]
     }
 
     pub(crate) const fn blockers(&self) -> Bitboard {
