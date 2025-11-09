@@ -51,7 +51,7 @@ enum LoopState {
     Review,
 }
 
-const LEARNING_RATE: f32 = 0.00001; //0.001
+const LEARNING_RATE: f32 = 0.000001; //0.001
 const LAMBDA: f32 = 0.1;
 const BETA1: f32 = 0.9;
 const BETA2: f32 = 0.999;
