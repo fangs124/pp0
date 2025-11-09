@@ -194,8 +194,11 @@ pub fn uci_iterative_deepening(
         let mut d: u16 = 1;
         let mut best_move: ChessMove = best_move;
         let mut duration: Duration = now.elapsed();
+        let mut loop_counter: usize = 0;
         while duration < hard_time_limit && d <= max_depth {
-            duration = now.elapsed();
+            if loop_counter >= 2048 {
+                duration = now.elapsed();
+            }
             if let Ok((chess_move_data, eval_data, node_count_data, d_data)) = rx.try_recv() {
                 let hashfull_count_permill: usize = tt_new.permil_count();
                 d = d_data;
@@ -221,6 +224,7 @@ pub fn uci_iterative_deepening(
                     );
                 }
             }
+            loop_counter += 1;
         }
 
         println!("bestmove {}", best_move.print_move());
