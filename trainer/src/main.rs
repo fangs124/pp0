@@ -52,6 +52,7 @@ enum LoopState {
 }
 const START_STRONGER_THAN_HCE: bool = true;
 const START_STRONGER_THAN_MAT: bool = true;
+const NO_REVIEW: bool = true;
 const LEARNING_RATE: f32 = 0.000001; //0.001
 const LAMBDA: f32 = 0.1;
 const BETA1: f32 = 0.9;
@@ -141,10 +142,16 @@ fn train(net: &mut Network) -> std::io::Result<()> {
     let mut training_scoreboard: ScoreBoard = ScoreBoard::new(training_ident, net_ident.clone(), mat_eval_ident.clone(), epoch, batch_size);
     let mut review_scoreboard: ScoreBoard = ScoreBoard::new(review_ident, net_ident.clone(), mat_eval_ident.clone(), epoch, batch_size);
     let mut results: Vec<MatchResult> = Vec::new();
-
+    let enm_net: Network = {
+        let file = File::open(ENM_FILENAME)?;
+        let mut buf_reader = BufReader::new(file);
+        let mut contents = String::new();
+        buf_reader.read_to_string(&mut contents)?;
+        serde_json::from_str(&contents).unwrap()
+    };
     let mut loop_state: LoopState = LoopState::Train;
     let mut player1: Player = Player { evaluator: PlayerEvaluator::Network(net.clone()), search_limit: SearchLimit::depth(NET_DEPTH) };
-    let mut player2: Player = Player { evaluator: PlayerEvaluator::Network(net.clone()), search_limit: SearchLimit::depth(NET_DEPTH) };
+    let mut player2: Player = Player { evaluator: PlayerEvaluator::Network(enm_net.clone()), search_limit: SearchLimit::depth(NET_DEPTH) };
     //let mut player2: Player = Player { evaluator: PlayerEvaluator::StaticEval(STATIC_EVAL.clone()), search_limit: SearchLimit::depth(ENM_START_DEPTH) };
     training_scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
 
@@ -304,9 +311,54 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                     //adam(net, results, BETA1, BETA2, &mut m, &mut v)?;
                     //update net, gradient stuff here
                     player1.evaluator = PlayerEvaluator::Network(net.clone());
-                    batch_size = BATCH_SIZE / REVIEW_COEFFICIENT;
                     results = Vec::new();
-                    loop_state = LoopState::Review;
+                    if !NO_REVIEW {
+                        batch_size = BATCH_SIZE / REVIEW_COEFFICIENT;
+                        loop_state = LoopState::Review;
+                    } else if NO_REVIEW {
+                        //the MAT_EVAL and HCE_EVAL case
+                        if (!is_stronger_than_mat_eval || !is_stronger_than_mat_eval) && best_win_rate >= 0.65 {
+                            if !START_STRONGER_THAN_HCE || !START_STRONGER_THAN_MAT {
+                                if let SearchLimit::Depth(d) = player2.search_limit
+                                    && d.get() < MAX_DEPTH_LIMIT
+                                {
+                                    player2.search_limit = SearchLimit::Depth(d.saturating_add(1));
+                                    scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
+                                } else {
+                                    if !is_stronger_than_mat_eval {
+                                        is_stronger_than_mat_eval = true;
+                                        player2.evaluator = PlayerEvaluator::StaticEval(STATIC_EVAL);
+                                        player2.search_limit = SearchLimit::depth(1);
+                                        scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
+                                    } else if is_stronger_than_mat_eval && !is_stronger_than_hce_eval {
+                                        is_stronger_than_hce_eval = true;
+                                        player2.evaluator = player1.evaluator.clone();
+                                        player2.search_limit = player1.search_limit.clone();
+                                        scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
+                                        if let PlayerEvaluator::Network(enm) = &player2.evaluator {
+                                            let mut file = File::create(ENM_FILENAME)?;
+                                            //enm.write(&mut file)?;
+                                            serde_json::to_writer(file, &enm)?;
+                                        }
+                                    }
+                                }
+                                best_lose_rate = 1.0;
+                                best_win_rate = 0.0;
+                            }
+                        } else if (is_stronger_than_mat_eval && is_stronger_than_mat_eval) && best_win_rate >= 0.65 {
+                            player2.evaluator = player1.evaluator.clone();
+                            player2.search_limit = player1.search_limit.clone();
+                            scoreboard.update_ident(&player1, &net_ident, &player2, &net_ident);
+                            best_lose_rate = 1.0;
+                            best_win_rate = 0.0;
+
+                            if let PlayerEvaluator::Network(ref enm) = player2.evaluator {
+                                let mut file = File::create(ENM_FILENAME)?;
+                                //enm.write(&mut file)?;
+                                serde_json::to_writer(file, &enm)?;
+                            }
+                        }
+                    }
                 }
 
                 LoopState::Review => {
@@ -321,31 +373,33 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                     write!(stdout, ", best win rate: {:.2}%\n\r", best_win_rate * 100.0)?;
                     //the MAT_EVAL and HCE_EVAL case
                     if (!is_stronger_than_mat_eval || !is_stronger_than_mat_eval) && best_win_rate >= 0.65 {
-                        if let SearchLimit::Depth(d) = player2.search_limit
-                            && d.get() < MAX_DEPTH_LIMIT
-                        {
-                            player2.search_limit = SearchLimit::Depth(d.saturating_add(1));
-                            scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
-                        } else {
-                            if !is_stronger_than_mat_eval {
-                                is_stronger_than_mat_eval = true;
-                                player2.evaluator = PlayerEvaluator::StaticEval(STATIC_EVAL);
-                                player2.search_limit = SearchLimit::depth(1);
+                        if !START_STRONGER_THAN_HCE || !START_STRONGER_THAN_MAT {
+                            if let SearchLimit::Depth(d) = player2.search_limit
+                                && d.get() < MAX_DEPTH_LIMIT
+                            {
+                                player2.search_limit = SearchLimit::Depth(d.saturating_add(1));
                                 scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
-                            } else if is_stronger_than_mat_eval && !is_stronger_than_hce_eval {
-                                is_stronger_than_hce_eval = true;
-                                player2.evaluator = player1.evaluator.clone();
-                                player2.search_limit = player1.search_limit.clone();
-                                scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
-                                if let PlayerEvaluator::Network(enm) = &player2.evaluator {
-                                    let mut file = File::create(ENM_FILENAME)?;
-                                    //enm.write(&mut file)?;
-                                    serde_json::to_writer(file, &enm)?;
+                            } else {
+                                if !is_stronger_than_mat_eval {
+                                    is_stronger_than_mat_eval = true;
+                                    player2.evaluator = PlayerEvaluator::StaticEval(STATIC_EVAL);
+                                    player2.search_limit = SearchLimit::depth(1);
+                                    scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
+                                } else if is_stronger_than_mat_eval && !is_stronger_than_hce_eval {
+                                    is_stronger_than_hce_eval = true;
+                                    player2.evaluator = player1.evaluator.clone();
+                                    player2.search_limit = player1.search_limit.clone();
+                                    scoreboard.update_ident(&player1, &net_ident, &player2, &mat_eval_ident);
+                                    if let PlayerEvaluator::Network(enm) = &player2.evaluator {
+                                        let mut file = File::create(ENM_FILENAME)?;
+                                        //enm.write(&mut file)?;
+                                        serde_json::to_writer(file, &enm)?;
+                                    }
                                 }
                             }
+                            best_lose_rate = 1.0;
+                            best_win_rate = 0.0;
                         }
-                        best_lose_rate = 1.0;
-                        best_win_rate = 0.0;
                     } else if (is_stronger_than_mat_eval && is_stronger_than_mat_eval) && best_win_rate >= 0.65 {
                         player2.evaluator = player1.evaluator.clone();
                         player2.search_limit = player1.search_limit.clone();
