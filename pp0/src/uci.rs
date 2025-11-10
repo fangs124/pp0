@@ -203,10 +203,10 @@ pub fn uci_iterative_deepening(
                 best_move = chess_move_data;
                 node_count += node_count_data;
                 let nps: usize = (node_count as f64 / duration.as_secs_f64()) as usize;
-                let mating_ply: i16 = eval_data.signum() * (((eval_data.signum() * WIN_SCORE - eval_data) / 2) + 1);
-                if mating_ply.abs() < 32 && eval_data != 0 {
+                let mating_depth: i16 = eval_data.signum() * (((eval_data.signum() * WIN_SCORE - eval_data) / 2) + 1);
+                if mating_depth.abs() < 32 && eval_data != 0 {
                     println!(
-                        "info score mate {mating_ply} depth {d} nodes {} nps {nps} time {} pv {} hashfull {}",
+                        "info score mate {mating_depth} depth {d} nodes {} nps {nps} time {} pv {} hashfull {}",
                         node_count_data,
                         duration.as_millis(),
                         best_move.print_move(),
