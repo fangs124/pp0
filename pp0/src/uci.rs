@@ -194,21 +194,19 @@ pub fn uci_iterative_deepening(
         let mut d: u16 = 1;
         let mut best_move: ChessMove = best_move;
         let mut duration: Duration = now.elapsed();
-        let mut loop_counter: usize = 0;
+        //let mut loop_counter: usize = 0;
         while duration < hard_time_limit && d <= max_depth {
-            if loop_counter >= 2048 {
-                duration = now.elapsed();
-            }
+            duration = now.elapsed();
             if let Ok((chess_move_data, eval_data, node_count_data, d_data)) = rx.try_recv() {
                 let hashfull_count_permill: usize = tt_new.permil_count();
                 d = d_data;
                 best_move = chess_move_data;
                 node_count += node_count_data;
                 let nps: usize = (node_count as f64 / duration.as_secs_f64()) as usize;
-                let mating_ply: i16 = ((eval_data.signum() * WIN_SCORE - eval_data) / 2) + 1;
-                if mating_ply.abs() < 32 && eval_data != 0 {
+                let mating_depth: i16 = eval_data.signum() * (((eval_data.signum() * WIN_SCORE - eval_data) / 2) + 1);
+                if mating_depth.abs() < 32 && eval_data != 0 {
                     println!(
-                        "info score mate {mating_ply} depth {d} nodes {} nps {nps} time {} pv {} hashfull {}",
+                        "info score mate {mating_depth} depth {d} nodes {} nps {nps} time {} pv {} hashfull {}",
                         node_count_data,
                         duration.as_millis(),
                         best_move.print_move(),
@@ -224,7 +222,7 @@ pub fn uci_iterative_deepening(
                     );
                 }
             }
-            loop_counter += 1;
+            //loop_counter += 1;
         }
 
         println!("bestmove {}", best_move.print_move());
