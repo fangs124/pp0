@@ -317,7 +317,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                         batch_size = BATCH_SIZE / REVIEW_COEFFICIENT;
                         loop_state = LoopState::Review;
                     } else if NO_REVIEW {
-                        let new_win_score: f32 = (scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0) / (scoreboard.finished_count as f32);
+                        let new_win_score: f32 = ((scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0)) / (scoreboard.finished_count as f32);
                         let new_win_rate: f32 = (scoreboard.wins as f32) / (scoreboard.finished_count as f32);
                         let new_lose_rate: f32 = (scoreboard.losses as f32) / (scoreboard.finished_count as f32);
                         best_win_score = best_win_score.max(new_win_score);
@@ -371,7 +371,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                 }
 
                 LoopState::Review => {
-                    let new_win_score: f32 = (scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0) / (scoreboard.finished_count as f32);
+                    let new_win_score: f32 = ((scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0)) / (scoreboard.finished_count as f32);
                     let new_win_rate: f32 = (scoreboard.wins as f32) / (scoreboard.finished_count as f32);
                     let new_lose_rate: f32 = (scoreboard.losses as f32) / (scoreboard.finished_count as f32);
                     best_win_score = best_win_score.max(new_win_score);
