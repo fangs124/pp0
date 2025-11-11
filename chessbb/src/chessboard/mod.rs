@@ -249,8 +249,14 @@ impl ChessGame {
         self.chessboard.is_fifty_move_rule()
     }
 
+    #[inline(always)]
+    pub fn is_insufficient_material(&self) -> bool {
+        self.chessboard.is_insufficient_material()
+    }
+
     pub fn try_check_gamestate(&self) -> (Option<MoveList>, GameState) {
-        if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
+        //if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
+        if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() {
             return (None, GameState::Finished(GameResult::Draw));
         }
 
@@ -275,7 +281,8 @@ impl ChessGame {
     }
 
     pub fn try_generate_moves(&self) -> (MoveList, GameState) {
-        if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
+        //if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
+        if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() {
             return (MoveList::new(), GameState::Finished(GameResult::Draw));
         }
         let side = self.side();

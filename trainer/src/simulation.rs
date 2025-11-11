@@ -80,6 +80,10 @@ pub fn play<const COLLECT_PAIRS: bool>(player1: &mut Player, player2: &mut Playe
         if let GameState::Finished(result) = game_state {
             break result;
         }
+        
+        if chessgame.is_insufficient_material() {
+            break GameResult::Draw;
+        }
 
         let side: Side = chessgame.side();
 
