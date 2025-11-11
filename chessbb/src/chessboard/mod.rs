@@ -254,10 +254,18 @@ impl ChessGame {
         self.chessboard.is_insufficient_material()
     }
 
-    pub fn try_check_gamestate(&self) -> (Option<MoveList>, GameState) {
-        //if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
-        if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() {
-            return (None, GameState::Finished(GameResult::Draw));
+    pub fn try_check_gamestate<const IS_ROOT: bool>(&self) -> (Option<MoveList>, GameState) {
+        match IS_ROOT {
+            true => {
+                if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() {
+                    return (None, GameState::Finished(GameResult::Draw));
+                }
+            }
+            false => {
+                if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
+                    return (None, GameState::Finished(GameResult::Draw));
+                }
+            }
         }
 
         let target_mask = match self.is_in_check() {
@@ -280,10 +288,18 @@ impl ChessGame {
         }
     }
 
-    pub fn try_generate_moves(&self) -> (MoveList, GameState) {
-        //if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
-        if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() {
-            return (MoveList::new(), GameState::Finished(GameResult::Draw));
+    pub fn try_generate_moves<const IS_ROOT: bool>(&self) -> (MoveList, GameState) {
+        match IS_ROOT {
+            true => {
+                if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() {
+                    return (MoveList::new(), GameState::Finished(GameResult::Draw));
+                }
+            }
+            false => {
+                if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
+                    return (MoveList::new(), GameState::Finished(GameResult::Draw));
+                }
+            }
         }
         let side = self.side();
         let moves = self.chessboard.generate_moves();
