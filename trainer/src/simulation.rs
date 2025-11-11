@@ -62,7 +62,7 @@ pub fn play<const COLLECT_PAIRS: bool>(player1: &mut Player, player2: &mut Playe
     player1.evaluator.initialize(&chessgame);
     player2.evaluator.initialize(&chessgame);
 
-    let (mut moves, mut game_state) = chessgame.try_generate_moves();
+    let (mut moves, mut game_state) = chessgame.try_generate_moves::<true>();
     assert!(!moves.is_empty());
 
     let mut pairs: Option<Vec<((SparseVec, SparseVec), i16)>> = match COLLECT_PAIRS {
@@ -79,6 +79,10 @@ pub fn play<const COLLECT_PAIRS: bool>(player1: &mut Player, player2: &mut Playe
     let result: GameResult = loop {
         if let GameState::Finished(result) = game_state {
             break result;
+        }
+
+        if chessgame.is_insufficient_material() {
+            break GameResult::Draw;
         }
 
         let side: Side = chessgame.side();
@@ -109,7 +113,7 @@ pub fn play<const COLLECT_PAIRS: bool>(player1: &mut Player, player2: &mut Playe
         //player1.evaluator.update(&chessgame, &chess_move);
         //player2.evaluator.update(&chessgame, &chess_move);
         chessgame.update_state(&chess_move);
-        (moves, game_state) = chessgame.try_generate_moves();
+        (moves, game_state) = chessgame.try_generate_moves::<true>();
     };
 
     let net_side: Side = match p1_white {

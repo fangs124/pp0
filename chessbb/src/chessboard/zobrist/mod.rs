@@ -16,7 +16,6 @@ pub mod bit_ops;
 
 include!("data/data.rs");
 
-
 #[cfg(feature = "bytemuck")]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, NoUninit, AnyBitPattern)]
 #[repr(transparent)]
@@ -64,13 +63,13 @@ impl ZobristTable {
             Some(i) => i,
             None => 0,
         };
-
+        //let mut i: usize = 0;
         let mut count: usize = 0;
         while i <= self.index {
             if self.data[i].0 == hash.0 {
                 count += 1;
             }
-            i += 2
+            i += 1
         }
         return count;
     }
@@ -119,12 +118,7 @@ impl ZobristHash {
         ZobristHash(value)
     }
 
-    pub(crate) const fn compute_hash(
-        side: Side,
-        mb: &Mailbox,
-        castle: [bool; 4],
-        enpassant: Bitboard,
-    ) -> ZobristHash {
+    pub(crate) const fn compute_hash(side: Side, mb: &Mailbox, castle: [bool; 4], enpassant: Bitboard) -> ZobristHash {
         //side hash
         let mut value = match side {
             Side::White => 0u64,

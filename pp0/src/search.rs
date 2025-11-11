@@ -81,7 +81,7 @@ impl SearchLimit {
 
 pub struct SearchData {
     ply: u16,
-    max_depth: usize,
+    max_ply: u16,
     node_count: usize,
     collect_pairs: bool,
     pairs: Option<((SparseVec, SparseVec), i16)>,
@@ -90,19 +90,27 @@ pub struct SearchData {
 
 type TT = TranspositionTable;
 
-const NODE_COUNT_CHECK_LIMIT: usize = 1024;
+const NODE_COUNT_CHECK_LIMIT: usize = 2048;
 const DEFAULT_QSEARCH_MAX_DEPTH: usize = 3;
 impl SearchData {
     pub const fn new() -> SearchData {
-        SearchData { ply: 0, max_depth: 0, node_count: 0, collect_pairs: false, pairs: None, is_aborted: false }
+        SearchData { ply: 0, max_ply: 0, node_count: 0, collect_pairs: false, pairs: None, is_aborted: false }
     }
 
     pub const fn new_collect_pairs() -> SearchData {
-        SearchData { ply: 0, max_depth: 0, node_count: 0, collect_pairs: true, pairs: None, is_aborted: false }
+        SearchData { ply: 0, max_ply: 0, node_count: 0, collect_pairs: true, pairs: None, is_aborted: false }
     }
 
     pub const fn ply(&self) -> u16 {
         self.ply
+    }
+
+    pub const fn set_ply(&mut self, ply: u16) {
+        self.ply = ply;
+    }
+
+    pub const fn max_ply(&self) -> u16 {
+        self.max_ply
     }
 
     pub const fn node_count(&self) -> usize {
@@ -345,7 +353,9 @@ impl SearchData {
         &mut self, chessgame: &mut ChessGame, a: i16, b: i16, d: usize, ev: &mut impl Evaluator, tt: Arc<TT>, time_limit: Option<(Instant, Duration)>,
         node_limit: Option<NonZero<usize>>,
     ) -> i16 {
-        let (chessmoves, gamestate) = chessgame.try_check_gamestate();
+        self.max_ply = self.max_ply.max(self.ply);
+        let (chessmoves, gamestate) = chessgame.try_check_gamestate::<false>();
+
         if let GameState::Finished(state) = gamestate {
             match state {
                 GameResult::Win(_) => {
@@ -458,7 +468,8 @@ impl SearchData {
         &mut self, chessgame: &mut ChessGame, a: i16, b: i16, d: usize, ev: &mut impl Evaluator, tt: Arc<TT>, time_limit: Option<(Instant, Duration)>,
         node_limit: Option<NonZero<usize>>,
     ) -> i16 {
-        if chessgame.repetition() >= 3 || chessgame.is_fifty_move_rule() {
+        self.max_ply = self.max_ply.max(self.ply);
+        if chessgame.is_draw_by_repetition() || chessgame.is_fifty_move_rule() {
             return 0;
         }
 
@@ -477,7 +488,7 @@ impl SearchData {
 
         let mut chessmoves = match chessgame.is_in_check() {
             true => {
-                let (moves, game_state) = chessgame.try_generate_moves();
+                let (moves, game_state) = chessgame.try_generate_moves::<false>();
                 if let GameState::Finished(state) = game_state {
                     match state {
                         GameResult::Win(_) => {
