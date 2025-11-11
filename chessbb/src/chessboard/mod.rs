@@ -240,12 +240,17 @@ impl ChessGame {
     }
 
     #[inline(always)]
+    pub fn is_draw_by_repetition(&self) -> bool {
+        self.zobrist_table.count_hash(self.hash()) >= 3
+    }
+
+    #[inline(always)]
     pub fn is_fifty_move_rule(&self) -> bool {
         self.chessboard.is_fifty_move_rule()
     }
 
     pub fn try_check_gamestate(&self) -> (Option<MoveList>, GameState) {
-        if self.repetition() >= 3 || self.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
+        if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
             return (None, GameState::Finished(GameResult::Draw));
         }
 
@@ -270,7 +275,7 @@ impl ChessGame {
     }
 
     pub fn try_generate_moves(&self) -> (MoveList, GameState) {
-        if self.repetition() >= 3 || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
+        if self.is_draw_by_repetition() || self.chessboard.is_fifty_move_rule() || self.chessboard.is_insufficient_material() {
             return (MoveList::new(), GameState::Finished(GameResult::Draw));
         }
         let side = self.side();

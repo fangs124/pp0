@@ -182,7 +182,8 @@ pub fn uci_iterative_deepening(
         return;
     }
     let mut best_d: u16 = 0;
-    let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize, u16)>();
+    let mut selective_d: u16 = 0;
+    let (tx, rx) = mpsc::channel::<(ChessMove, i16, usize, u16, u16)>();
     let mut d = 1;
     let max_depth: u16 = match max_depth {
         Some(x) => x,
@@ -197,16 +198,16 @@ pub fn uci_iterative_deepening(
         //let mut loop_counter: usize = 0;
         while duration < hard_time_limit && d <= max_depth {
             duration = now.elapsed();
-            if let Ok((chess_move_data, eval_data, node_count_data, d_data)) = rx.try_recv() {
+            if let Ok((chess_move_data, eval_data, node_count_data, d_data, selective_d)) = rx.try_recv() {
                 let hashfull_count_permill: usize = tt_new.permil_count();
                 d = d_data;
                 best_move = chess_move_data;
                 node_count += node_count_data;
                 let nps: usize = (node_count as f64 / duration.as_secs_f64()) as usize;
-                let mating_depth: i16 = eval_data.signum() * (((eval_data.signum() * WIN_SCORE - eval_data) / 2) + 1);
+                let mating_depth: i16 = (((eval_data.signum() * WIN_SCORE - eval_data) / 2) + 1);
                 if mating_depth.abs() < 32 && eval_data != 0 {
                     println!(
-                        "info score mate {mating_depth} depth {d} nodes {} nps {nps} time {} pv {} hashfull {}",
+                        "info score mate {mating_depth} depth {d} seldepth {selective_d} nodes {} nps {nps} time {} pv {} hashfull {}",
                         node_count_data,
                         duration.as_millis(),
                         best_move.print_move(),
@@ -214,7 +215,7 @@ pub fn uci_iterative_deepening(
                     );
                 } else {
                     println!(
-                        "info score cp {eval_data} depth {d} nodes {} nps {nps} time {} pv {} hashfull {}",
+                        "info score cp {eval_data} depth {d} seldepth {selective_d} nodes {} nps {nps} time {} pv {} hashfull {}",
                         node_count_data,
                         duration.as_millis(),
                         best_move.print_move(),
@@ -233,6 +234,7 @@ pub fn uci_iterative_deepening(
 
     'search: while now.elapsed() < soft_time_limit && d <= max_depth {
         let mut search_data: SearchData = SearchData::new();
+        search_data.set_ply(1);
         let mut best_eval: i16 = i16::MIN + 1;
         net.update(&chessgame, &best_move);
         let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&best_move);
@@ -259,7 +261,6 @@ pub fn uci_iterative_deepening(
             if chessmove == best_move {
                 continue;
             }
-
             net.update(&chessgame, &chessmove);
             let snapshot: chessbb::ChessBoardSnapshot = chessgame.explore_state(&chessmove);
             let eval: i16 =
@@ -279,17 +280,18 @@ pub fn uci_iterative_deepening(
                 best_eval = eval;
                 best_move = chessmove.clone();
                 best_d = d;
+                selective_d = search_data.max_ply();
             }
 
             if nodes_since_last_check >= LOOP_COUNT_CHECK_LIMIT {
-                if now.elapsed() >= hard_time_limit {
+                if now.elapsed() >= soft_time_limit {
                     break;
                 }
                 nodes_since_last_check = 0;
             }
         }
 
-        if let Err(_) = tx.send((best_move, best_eval, node_count, d)) {
+        if let Err(_) = tx.send((best_move, best_eval, node_count, d, selective_d)) {
             break;
         }
         //send data
