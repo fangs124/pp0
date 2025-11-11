@@ -354,8 +354,7 @@ impl SearchData {
         node_limit: Option<NonZero<usize>>,
     ) -> i16 {
         self.max_ply = self.max_ply.max(self.ply);
-        let (chessmoves, gamestate) = chessgame.try_check_gamestate::<false>();
-
+        let (chessmoves, gamestate) = chessgame.try_check_gamestate();
         if let GameState::Finished(state) = gamestate {
             match state {
                 GameResult::Win(_) => {
@@ -488,7 +487,7 @@ impl SearchData {
 
         let mut chessmoves = match chessgame.is_in_check() {
             true => {
-                let (moves, game_state) = chessgame.try_generate_moves::<false>();
+                let (moves, game_state) = chessgame.try_generate_moves();
                 if let GameState::Finished(state) = game_state {
                     match state {
                         GameResult::Win(_) => {

@@ -76,7 +76,7 @@ pub fn uci_bench(net: &mut Network) {
         let tt: Arc<TT> = Arc::new(TT::new());
         net.initialize(&chessgame);
         let mut data = SearchData::new();
-        let (chessmoves, _game_state) = chessgame.try_generate_moves::<true>();
+        let (chessmoves, _game_state) = chessgame.try_generate_moves();
         let now = Instant::now();
         _ = data.find_move(&mut chessgame, net, tt, &SearchLimit::Depth(BENCH_DEPTH), &chessmoves);
         total_time += now.elapsed();
@@ -172,7 +172,7 @@ const LOOP_COUNT_CHECK_LIMIT: usize = 2048;
 pub fn uci_iterative_deepening(
     chessgame: &mut ChessGame, net: &mut Network, max_depth: Option<u16>, tt: Arc<TT>, now: Instant, soft_time_limit: Duration, hard_time_limit: Duration,
 ) {
-    let mut moves = chessgame.try_generate_moves::<true>().0;
+    let mut moves = chessgame.try_generate_moves().0;
     let moves_len = moves.len();
     assert!(!moves.is_empty());
     let mut node_count: usize = 0;
