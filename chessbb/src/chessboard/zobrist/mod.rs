@@ -63,7 +63,7 @@ impl ZobristTable {
             Some(i) => i,
             None => 0,
         };
-
+        //let mut i: usize = 0;
         let mut count: usize = 0;
         while i <= self.index {
             if self.data[i].0 == hash.0 {
