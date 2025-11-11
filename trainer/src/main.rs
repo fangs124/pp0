@@ -53,7 +53,7 @@ enum LoopState {
 const START_STRONGER_THAN_HCE: bool = true;
 const START_STRONGER_THAN_MAT: bool = true;
 const NO_REVIEW: bool = true;
-const LEARNING_RATE: f32 = 0.000001; //0.001
+const LEARNING_RATE: f32 = 0.00001; //0.001
 const LAMBDA: f32 = 0.1;
 const BETA1: f32 = 0.9;
 const BETA2: f32 = 0.999;
@@ -317,7 +317,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                         batch_size = BATCH_SIZE / REVIEW_COEFFICIENT;
                         loop_state = LoopState::Review;
                     } else if NO_REVIEW {
-                        let new_win_score: f32 = (scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0) / (scoreboard.finished_count as f32);
+                        let new_win_score: f32 = ((scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0)) / (scoreboard.finished_count as f32);
                         let new_win_rate: f32 = (scoreboard.wins as f32) / (scoreboard.finished_count as f32);
                         let new_lose_rate: f32 = (scoreboard.losses as f32) / (scoreboard.finished_count as f32);
                         best_win_score = best_win_score.max(new_win_score);
@@ -371,7 +371,7 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                 }
 
                 LoopState::Review => {
-                    let new_win_score: f32 = (scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0) / (scoreboard.finished_count as f32);
+                    let new_win_score: f32 = ((scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0)) / (scoreboard.finished_count as f32);
                     let new_win_rate: f32 = (scoreboard.wins as f32) / (scoreboard.finished_count as f32);
                     let new_lose_rate: f32 = (scoreboard.losses as f32) / (scoreboard.finished_count as f32);
                     best_win_score = best_win_score.max(new_win_score);
