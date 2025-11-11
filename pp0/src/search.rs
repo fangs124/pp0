@@ -90,7 +90,7 @@ pub struct SearchData {
 
 type TT = TranspositionTable;
 
-const NODE_COUNT_CHECK_LIMIT: usize = 1024;
+const NODE_COUNT_CHECK_LIMIT: usize = 2048;
 const DEFAULT_QSEARCH_MAX_DEPTH: usize = 3;
 impl SearchData {
     pub const fn new() -> SearchData {
