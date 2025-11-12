@@ -60,7 +60,7 @@ const BETA2: f32 = 0.999;
 const NET_DEPTH: usize = 4;
 const MAX_DEPTH_LIMIT: usize = 4;
 const ENM_START_DEPTH: usize = 4;
-const BATCH_SIZE: usize = 2000; //the games played is doubled this
+const BATCH_SIZE: usize = 4000; //the games played is doubled this
 const REVIEW_COEFFICIENT: usize = 2; //this is the n in: review =  (1/n) * batch_size
 const PREVIOUS_FILENAME: &str = "prv.nnue";
 const NET_FILENAME: &str = "net.nnue";
