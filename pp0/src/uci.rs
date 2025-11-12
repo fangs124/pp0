@@ -270,7 +270,7 @@ pub fn uci_iterative_deepening(
         //}
 
         //search previous best_move
-        for chessmove in &moves {
+        'moves: for chessmove in &moves {
             if *chessmove == best_move {
                 continue;
             }
@@ -299,7 +299,7 @@ pub fn uci_iterative_deepening(
 
             if nodes_since_last_check >= LOOP_COUNT_CHECK_LIMIT {
                 if now.elapsed() >= soft_time_limit {
-                    break;
+                    break 'moves;
                 }
                 nodes_since_last_check = 0;
             }
