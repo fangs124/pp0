@@ -118,6 +118,9 @@ pub fn uci_position(chessgame: &mut ChessGame, cmd_str: &str, last_fen: &mut Vec
         } else {
             chessgame.update_state(&chessgame.parse_move(cmd));
         }
+        //println!("position:\n{}", chessgame);
+        //println!("hash:\n{:?}\n", chessgame.hash());
+        //println!("repetition:\n{:?}\n", chessgame.repetition());
     }
 }
 

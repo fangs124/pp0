@@ -103,6 +103,12 @@ pub struct ChessBoardSnapshot {
     hash: ZobristHash,
 }
 
+impl Display for ChessGame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.chessboard, f)
+    }
+}
+
 impl Display for ChessBoard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut rows: Vec<String> = Vec::new();
@@ -124,6 +130,7 @@ impl Display for ChessBoard {
         write!(f, "{}", rows.join(""))
     }
 }
+
 impl Debug for ChessBoard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = String::new();
