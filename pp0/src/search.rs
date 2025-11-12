@@ -379,10 +379,8 @@ impl SearchData {
         let mut best_score: i16 = i16::MIN + 1;
         let mut best_move: Option<ChessMove> = None;
 
-        if let Some(position_data) = tt.load(chessgame.hash(), Ordering::Relaxed)
-            && self.ply > 1
-        {
-            if position_data.depth() as usize >= d {
+        if let Some(position_data) = tt.load(chessgame.hash(), Ordering::Relaxed) {
+            if position_data.depth() as usize >= d && self.ply > 1 {
                 match position_data.ty() {
                     NodeType::Exact => {
                         return position_data.eval();
