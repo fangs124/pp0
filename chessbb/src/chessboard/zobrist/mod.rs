@@ -59,7 +59,7 @@ impl ZobristTable {
     }
 
     pub const fn count_hash(&self, hash: ZobristHash) -> usize {
-        let mut i: usize = match self.index.checked_sub(100) {
+        let mut i: usize = match self.index.checked_sub(200) {
             Some(i) => i,
             None => 0,
         };
