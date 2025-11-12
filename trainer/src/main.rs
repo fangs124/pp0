@@ -53,14 +53,14 @@ enum LoopState {
 const START_STRONGER_THAN_HCE: bool = true;
 const START_STRONGER_THAN_MAT: bool = true;
 const NO_REVIEW: bool = true;
-const LEARNING_RATE: f32 = 0.00001; //0.001
+const LEARNING_RATE: f32 = 0.000001; //0.001
 const LAMBDA: f32 = 0.1;
 const BETA1: f32 = 0.9;
 const BETA2: f32 = 0.999;
 const NET_DEPTH: usize = 4;
 const MAX_DEPTH_LIMIT: usize = 4;
 const ENM_START_DEPTH: usize = 4;
-const BATCH_SIZE: usize = 4000; //the games played is doubled this
+const BATCH_SIZE: usize = 2000; //the games played is doubled this
 const REVIEW_COEFFICIENT: usize = 2; //this is the n in: review =  (1/n) * batch_size
 const PREVIOUS_FILENAME: &str = "prv.nnue";
 const NET_FILENAME: &str = "net.nnue";
