@@ -57,14 +57,15 @@ const LEARNING_RATE: f32 = 0.000001; //0.001
 const LAMBDA: f32 = 0.1;
 const BETA1: f32 = 0.9;
 const BETA2: f32 = 0.999;
-const NET_DEPTH: usize = 4;
-const MAX_DEPTH_LIMIT: usize = 4;
-const ENM_START_DEPTH: usize = 4;
-const BATCH_SIZE: usize = 2000; //the games played is doubled this
-const REVIEW_COEFFICIENT: usize = 2; //this is the n in: review =  (1/n) * batch_size
+const NET_DEPTH: usize = 3;
+const MAX_DEPTH_LIMIT: usize = 3;
+const ENM_START_DEPTH: usize = 3;
+const BATCH_SIZE: usize = 4000; //the games played is doubled this
+const REVIEW_COEFFICIENT: usize = 4; //this is the n in: review =  (1/n) * batch_size
 const PREVIOUS_FILENAME: &str = "prv.nnue";
 const NET_FILENAME: &str = "net.nnue";
 const ENM_FILENAME: &str = "enm.nnue";
+const BST_FILENAME: &str = "bst.nnue";
 const LOG_FILENAME: &str = "training.log";
 const DEBUG_FILENAME: &str = "debug.txt";
 const BOOK: &str = "UHO_Lichess_4852_v1.epd";
@@ -320,6 +321,13 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                         let new_win_score: f32 = ((scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0)) / (scoreboard.finished_count as f32);
                         let new_win_rate: f32 = (scoreboard.wins as f32) / (scoreboard.finished_count as f32);
                         let new_lose_rate: f32 = (scoreboard.losses as f32) / (scoreboard.finished_count as f32);
+                        if new_win_score > best_win_score {
+                            //enm.write(&mut file)?;
+                            if let PlayerEvaluator::Network(net) = &player1.evaluator {
+                                let mut file = File::create(BST_FILENAME)?;
+                                serde_json::to_writer(file, &net)?;
+                            }
+                        }
                         best_win_score = best_win_score.max(new_win_score);
                         best_win_rate = best_win_rate.max(new_win_rate);
                         best_lose_rate = best_lose_rate.min(new_lose_rate);
@@ -374,6 +382,13 @@ fn train(net: &mut Network) -> std::io::Result<()> {
                     let new_win_score: f32 = ((scoreboard.wins as f32) + (scoreboard.draws as f32 / 2.0)) / (scoreboard.finished_count as f32);
                     let new_win_rate: f32 = (scoreboard.wins as f32) / (scoreboard.finished_count as f32);
                     let new_lose_rate: f32 = (scoreboard.losses as f32) / (scoreboard.finished_count as f32);
+                    if new_win_score > best_win_score {
+                        //enm.write(&mut file)?;
+                        if let PlayerEvaluator::Network(net) = &player1.evaluator {
+                            let mut file = File::create(BST_FILENAME)?;
+                            serde_json::to_writer(file, &net)?;
+                        }
+                    }
                     best_win_score = best_win_score.max(new_win_score);
                     best_win_rate = best_win_rate.max(new_win_rate);
                     best_lose_rate = best_lose_rate.min(new_lose_rate);
